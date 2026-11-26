@@ -7,10 +7,10 @@ An MIT-licensed Windows desktop calendar widget built with C#, .NET 10 and WPF. 
 - Day, three consecutive days, Monday–Friday workweek, Monday–Sunday week, month and twelve-month year views.
 - Today navigation, previous/next periods and clickable dates. Event details appear on hover. Month cells show a compact event preview and a count; smaller widgets use event dots. Hover a date for the event summary, or open a day to see the full agenda.
 - Multiple Google calendars with individual visibility and calendar colors.
-- Read-only Google Calendar synchronization, recurring event instances, all-day events and events spanning midnight. Timed events use the Windows local time zone; all-day dates retain their calendar dates and exclusive end dates.
+- Read-only Google Calendar synchronization, recurring event instances, all-day events and events spanning midnight. Timed events and the red current-time marker use the primary Google calendar time zone by default; select another calendar as the time-zone source in settings. When cached metadata has no zone, the Windows local zone is used; all-day dates retain their calendar dates and exclusive end dates.
 - Automatic synchronization every 1–60 minutes (default: 5), manual synchronization and an encrypted offline cache. Navigation reuses fresh cached data.
 - Transparent frameless widget with rounded glass, quiet hover controls, saved position and size, light and dark text, Windows startup and system tray integration. Background tint adjusts from fully transparent to 85% without fading the text. The widget never creates a taskbar entry.
-- Normal, always-on-top and behind-other-windows behavior. The last option maintains bottom window order; it does not attach the widget to Explorer's wallpaper process.
+- The signed-in calendar is hosted inside the Explorer desktop view, above the wallpaper and below application windows. It survives Show Desktop / Win+D and uses nonactivating tool-window styles to stay out of Alt+Tab and the taskbar. Previous always-on-top preferences no longer lift the calendar above applications.
 
 ## Build and run
 
@@ -21,9 +21,9 @@ dotnet build Wideska/Wideska.slnx -c Release
 .\Wideska\bin\Release\net10.0-windows\Wideska.exe
 ```
 
-Drag the month heading to move the widget and the bottom-right corner grip to resize it. Controls appear when the mouse is over the widget or it has keyboard focus. Use the top-right close icon to hide it to the system tray. Click or double-click the tray icon to restore it. Right-click for Show widget, Hide widget (keep running), Settings / Google sign-in, Sync calendars, Move to visible screen, and Exit Wideska. Show temporarily brings even a desktop-mode widget forward; the desktop order resumes when it loses focus. A fully off-screen window is brought back onto the primary screen. Use Quit to exit completely. Only one instance runs per Windows session. Launching an updated Wideska again requests showing the running instance. Older builds do not understand this request: exit the old build once before starting the updated executable.
+Drag the month heading to move the widget and any edge or corner to resize it. Controls appear when the mouse is over the widget or it has keyboard focus. Use the top-right close icon to hide it to the system tray. Click or double-click the tray icon to restore it. Right-click for Show widget, Hide widget (keep running), Settings / Google sign-in, Sync calendars, Move to visible screen, Lock position and size, Fill desktop work area, and Exit Wideska. Showing a signed-in widget keeps it in the desktop layer and preserves application focus. A fully off-screen window is brought back onto the primary screen. Use Quit to exit completely. Only one instance runs per Windows session. Launching an updated Wideska again requests showing the running instance. Older builds do not understand this request: exit the old build once before starting the updated executable.
 
-Open the gear menu to choose text contrast, background tint, window behavior, startup preference, synchronization interval and visible calendars. Position and size are saved after moving or resizing. Select Done to save settings. Choosing fully transparent removes the calendar's background while preserving opaque text and event colors; no simulated wallpaper image is used. On light wallpaper, turn off light text or increase the tint for contrast. The connection screen and settings panel retain a readable background.
+Open the gear menu to choose text contrast, background tint, geometry locking, desktop fill, startup preference, calendar time zone, synchronization interval and visible calendars. Physical screen position and size are saved after moving or resizing, including negative coordinates on secondary displays. Desktop fill uses the current monitor work area and excludes the taskbar. Locking disables drag, resize, centering and fill. Select Done to save settings. Choosing fully transparent removes the calendar's background while preserving opaque text and event colors; no simulated wallpaper image is used. On light wallpaper, turn off light text or increase the tint for contrast. The connection screen and settings panel retain a readable background.
 
 Windows startup uses the current executable path: move the executable to a permanent location before enabling it. If the running widget locks the usual build output, quit it from the tray before rebuilding, or build into a separate directory:
 
@@ -31,6 +31,14 @@ Windows startup uses the current executable path: move the executable to a perma
 dotnet build Wideska/Wideska.slnx -c Release --artifacts-path artifacts/build
 .\artifacts\build\bin\Wideska\release\Wideska.exe
 ```
+
+## Time scale and desktop hosting
+
+Day, three-day, workweek and week views use a shared 24-hour grid. Timed events occupy their calendar-local slots and overlapping events use separate lanes. All-day events remain above the hourly grid. A red line and starting dot appear only in the current calendar-local day and render above events. A dispatcher timer updates the clock at minute boundaries without API calls or rebuilding the view. Opening a day/week view scrolls near the current time; later ticks preserve the chosen scroll position. Month and year views have no hourly scale and do not display the line.
+
+Desktop integration uses Win32 `SetParent` with the existing `SHELLDLL_DefView` desktop view. This also accommodates the raised desktop composition used by recent Windows 11 versions. It does not use a periodically lowered top-level window or change Explorer styles. Authentication remains a separate presentation state in the existing window; its browser flow, scopes and token handling are unchanged. Explorer must be running for desktop hosting. The shell desktop class is an Explorer implementation detail: validate new Windows shell builds and restart Wideska if Explorer is restarted and destroys the hosted window.
+
+The executable declares Per-Monitor V2 awareness. Geometry uses native physical screen coordinates, while WPF content is adjusted for the monitor DPI because a child HWND otherwise inherits the desktop host DPI. Display/DPI changes re-evaluate scaling and recover windows on disconnected monitors. Mixed-DPI monitor layouts and Windows logon should also be checked on the target hardware.
 
 ## Connect Google Calendar
 
@@ -62,12 +70,15 @@ Calendar data goes only to the Google Calendar API. There is no application tele
 ## Verification
 
 ```powershell
-dotnet run --project Wideska.Tests -c Release
+dotnet build Wideska/Wideska.slnx -c Release
+.\Wideska.Tests\bin\Release\net10.0-windows\Wideska.Tests.exe
 ```
 
 This standalone test executable has no test framework dependency. It exits nonzero on failure. It checks calendar ranges, leap days, event overlap, exclusive all-day ends, visibility, caching, offline behavior, DPAPI persistence, Google pagination, recurring instance requests, token refresh and API errors. It loads the compiled XAML, renders all six views, checks binding errors, minimum window dimensions and light/dark resources. It also checks authorization-first launch, rejected consent, expired sessions, Desktop OAuth JSON import, taskbar absence, custom resizing and rendered pixel alpha. Native-message tray tests cover opening the menu while hidden, every menu action, off-screen recovery, desktop-mode reveal and the existing-instance show request. Preview PNGs are written to the ignored `artifacts` directory; wallpaper previews use a synthetic background only in the test harness. Tests briefly display an isolated window and tray icon with synthetic data, and exercise native window ordering. They do not read your Wideska settings, use your Google account or change startup registration.
 
 Manual acceptance checks on the target desktop: sign in to Google; compare recurring exceptions, all-day and cross-time-zone events with Google Calendar; hide/show calendars; disconnect; restart and check restored settings; verify tray actions, startup, multi-monitor movement and the preferred DPI settings. Live Google authorization, Windows logon startup and Explorer interactions require interactive verification.
+
+For an interactive shell check, run the test EXE with `--desktop-smoke`. It temporarily minimizes ordinary windows, checks desktop hosting and ToggleDesktop, saves a native screenshot of synthetic widget data, and restores the windows. Use the EXE so that the DPI and Windows compatibility manifest is active. Regular tests do not run Show Desktop. The suite also checks DST, calendar-zone midnight, minute updates without synchronization, overlap lanes, lock state and physical geometry across a fresh view-model instance.
 
 ## Structure
 
