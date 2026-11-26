@@ -41,6 +41,7 @@ public sealed class DayTimeline : Control
     private string? hover;
     private readonly ToolTip eventToolTip = new();
     private bool scrollPending;
+    private Rect slotArea = Rect.Empty;
     public DayTimeline()
     {
         MinHeight = MinimumTimelineHeight;
@@ -48,10 +49,12 @@ public sealed class DayTimeline : Control
         Loaded += (_, _) => { Observe(); ScheduleScroll(); };
         IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
         Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; };
-        MouseLeave += (_, _) => ClearHover();
+        MouseLeave += (_, _) => { Cursor = Cursors.Arrow; ClearHover(); };
         MouseMove += (_, e) =>
         {
-            string? details = hits.LastOrDefault(h => h.Bounds.Contains(e.GetPosition(this))).Details;
+            Point position = e.GetPosition(this);
+            Cursor = slotArea.Contains(position) ? Cursors.Hand : Cursors.Arrow;
+            string? details = hits.LastOrDefault(h => h.Bounds.Contains(position)).Details;
             if (details == hover) return;
             if (details is null) { ClearHover(); return; }
             hover = details; eventToolTip.Content = details; ToolTip = eventToolTip; InvalidateVisual();
@@ -105,13 +108,14 @@ public sealed class DayTimeline : Control
     }
     protected override void OnRender(DrawingContext dc)
     {
-        base.OnRender(dc); hits.Clear();
+        base.OnRender(dc); hits.Clear(); slotArea = Rect.Empty;
         var days = Days?.ToList() ?? [];
         if (days.Count == 0 || ActualWidth <= TimeGutterWidth) return;
         double column = (ActualWidth - TimeGutterWidth) / days.Count;
         int allDayRows = Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay)));
         double startY = TimeStart(days);
         double timelineHeight = Math.Max(24, ActualHeight - startY - 16);
+        slotArea = new Rect(TimeGutterWidth, startY, ActualWidth - TimeGutterWidth, timelineHeight);
         int today = days.FindIndex(d => CalendarTime.IndicatorMinutes(d.Date, CurrentTime, TimeZoneId) is not null);
         double? nowMinutes = today < 0 ? null : CalendarTime.IndicatorMinutes(days[today].Date, CurrentTime, TimeZoneId);
         double nowY = nowMinutes is null ? -100 : startY + nowMinutes.Value / 1440 * timelineHeight;
