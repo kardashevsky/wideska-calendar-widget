@@ -7,6 +7,11 @@
     <SolidColorBrush x:Key="Line" Color="#22FFFFFF"/>
     <SolidColorBrush x:Key="Accent" Color="#FFC4B5FD"/>
     <SolidColorBrush x:Key="AccentFill" Color="#FF8B72DB"/>
+    <SolidColorBrush x:Key="TimelineCard" Color="#ED202230"/>
+    <SolidColorBrush x:Key="TimelineMuted" Color="#CCD1E0"/>
+    <SolidColorBrush x:Key="TimelineAxis" Color="#80A1A9BF"/>
+    <SolidColorBrush x:Key="TimelineGrid" Color="#38CDD3E0"/>
+    <SolidColorBrush x:Key="TimelineNow" Color="#F43F5E"/>
     <BooleanToVisibilityConverter x:Key="VisibleIf"/>
     <converters:CompactHeightConverter x:Key="CompactHeight"/>
     <converters:TimelineWidthConverter x:Key="TimelineWidth"/>

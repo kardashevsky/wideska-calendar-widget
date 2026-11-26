@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -74,13 +74,13 @@ internal static partial class Program
         var layout = TimelineLayout.Arrange(events);
         Check(layout[0].LaneCount == 2 && layout[1].Lane != layout[0].Lane && layout[2].LaneCount == 1, "Overlapping events must occupy separate lanes without narrowing unrelated events");
         var day = new DayCell(new DateTime(2026,3,8), true, true, events);
-        var timeline = new Wideska.Controls.DayTimeline { Days = new[] { day }, TimeZoneId = "America/New_York", CurrentTime = instant, Foreground = System.Windows.Media.Brushes.White, Width = 600, Height = 1000 };
-        timeline.Measure(new Size(600,1000)); timeline.Arrange(new Rect(0,0,600,1000)); timeline.UpdateLayout();
-        var image = new System.Windows.Media.Imaging.RenderTargetBitmap(600,1000,96,96,System.Windows.Media.PixelFormats.Pbgra32);
+        var timeline = new Wideska.Controls.DayTimeline { Days = new[] { day }, TimeZoneId = "America/New_York", CurrentTime = instant, Foreground = System.Windows.Media.Brushes.White, Width = 600, Height = 1600 };
+        timeline.Measure(new Size(600,1600)); timeline.Arrange(new Rect(0,0,600,1600)); timeline.UpdateLayout();
+        var image = new System.Windows.Media.Imaging.RenderTargetBitmap(600,1600,96,96,System.Windows.Media.PixelFormats.Pbgra32);
         image.Render(timeline);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
         using (var file = System.IO.File.Create("artifacts/timeline.png")) encoder.Save(file);
-        Check(timeline.ActualHeight == 1000, "Timeline must scale to its available drawing height");
+        Check(timeline.ActualHeight == 1600, "Timeline must scale to its available drawing height");
         await TestCalendarClockAndPersistenceAsync(System.IO.Path.Combine(directory, "clock"));
     }
 }
