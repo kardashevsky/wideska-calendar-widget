@@ -18,6 +18,9 @@ public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyL
 {
     public string Label => Date.ToString("ddd, d", CultureInfo.CurrentCulture);
     public string Number => Date.Day.ToString(CultureInfo.InvariantCulture);
+    public IEnumerable<EventItem> PreviewEvents => Events.Take(1);
+    public string MoreEventsLabel => Events.Count > 1 ? $"+{Events.Count - 1}" : "";
+    public string Summary => Events.Count == 0 ? Date.ToString("D") : string.Join("\n", Events.Select(e => $"{e.Time}  {e.Title}"));
 }
 public sealed record MonthItem(string Title, IReadOnlyList<DayCell> Days);
 public sealed record ViewChoice(CalendarView Value, string Title)
@@ -51,7 +54,26 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool busy;
     public bool Busy { get => busy; private set => Set(ref busy, value); }
     private bool connected;
-    public bool Connected { get => connected; private set { Set(ref connected, value); Changed(nameof(ConnectionLabel)); } }
+    public bool Connected
+    {
+        get => connected;
+        private set
+        {
+            if (!Set(ref connected, value)) return;
+            Changed(nameof(ConnectionLabel)); NotifyPresentation();
+        }
+    }
+    private bool isInitialized;
+    public bool IsInitialized { get => isInitialized; private set { Set(ref isInitialized, value); NotifyPresentation(); } }
+    public bool ShowWidget => IsInitialized && Connected;
+    public bool ShowAuthorization => !ShowWidget;
+    public bool HasCredentials => !string.IsNullOrWhiteSpace(ClientId);
+    public string CredentialStatus => HasCredentials ? "Desktop OAuth client is ready" : "Import your Google Desktop OAuth file to get started";
+    private void NotifyPresentation()
+    {
+        Changed(nameof(ShowWidget)); Changed(nameof(ShowAuthorization));
+        AppearanceChanged?.Invoke();
+    }
     public string ConnectionLabel => Connected ? "Google Calendar connected" : "No account connected";
     private bool settingsOpen;
     public bool SettingsOpen { get => settingsOpen; set => Set(ref settingsOpen, value); }
@@ -66,10 +88,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         set { if (Settings.View == value) return; Settings.View = value; Changed(); Rebuild(); _ = SaveSafelyAsync(); }
     }
     public bool DarkTheme { get => Settings.DarkTheme; set { Settings.DarkTheme = value; Changed(); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
-    public double Opacity { get => Settings.Opacity; set { Settings.Opacity = Math.Clamp(value, .3, 1); Changed(); AppearanceChanged?.Invoke(); } }
+    public double BackgroundOpacity { get => Settings.BackgroundOpacity; set { Settings.BackgroundOpacity = Math.Clamp(value, 0, .85); Changed(); AppearanceChanged?.Invoke(); } }
     public WindowBehavior Behavior { get => Settings.Behavior; set { Settings.Behavior = value; Changed(); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
     public bool StartWithWindows { get => Settings.StartWithWindows; set { Settings.StartWithWindows = value; Changed(); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
-    public string ClientId { get => Settings.ClientId; set { Settings.ClientId = value; Changed(); } }
+    public string ClientId { get => Settings.ClientId; set { Settings.ClientId = value; Changed(); Changed(nameof(HasCredentials)); Changed(nameof(CredentialStatus)); } }
     public string ClientSecret { get => Settings.ClientSecret; set { Settings.ClientSecret = value; Changed(); } }
     public int SyncMinutes { get => Settings.SyncMinutes; set { Settings.SyncMinutes = Math.Clamp(value, 1, 60); Changed(); } }
     public event Action? AppearanceChanged;
@@ -93,15 +115,32 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         DisconnectCommand = new AsyncCommand(async () =>
         {
             await syncGate.WaitAsync(lifetime.Token);
-            try { await provider.DisconnectAsync(lifetime.Token); Connected = false; snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); await store.DeleteAsync("calendar-cache.bin"); Rebuild(); Status = "Account disconnected. Local calendar cache removed."; }
-            finally { syncGate.Release(); }
+            Busy = true;
+            try
+            {
+                SettingsOpen = false; Connected = false;
+                snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); Rebuild();
+                Status = "Disconnecting Google account…";
+                await store.DeleteAsync("calendar-cache.bin");
+                await provider.DisconnectAsync(lifetime.Token);
+                Status = "Account disconnected. Sign in to show your desktop calendar.";
+            }
+            finally { Busy = false; syncGate.Release(); }
         }, ReportError);
-        SettingsCommand = new RelayCommand(_ => SettingsOpen = !SettingsOpen);
+        SettingsCommand = new RelayCommand(_ => { SettingsOpen = !SettingsOpen; if (!SettingsOpen) _ = SaveSafelyAsync(); });
         SaveSettingsCommand = new AsyncCommand(async () => { await SaveAsync(); SettingsOpen = false; await RefreshAsync(); }, ReportError);
         SelectDayCommand = new RelayCommand(value => { if (value is DateTime date) { followToday = false; anchor = date; if (View == CalendarView.SingleDay) Rebuild(); else View = CalendarView.SingleDay; _ = RefreshIfNeededAsync(); } });
         Rebuild();
     }
-    private async Task ConnectAsync()
+    public async Task ImportCredentialsAsync(string path)
+    {
+        var configuration = await GoogleOAuthConfiguration.ReadAsync(path, lifetime.Token);
+        ClientId = configuration.ClientId;
+        ClientSecret = configuration.ClientSecret;
+        await SaveAsync();
+        Status = "OAuth client imported. Continue with Google to connect your calendar.";
+    }
+    public async Task ConnectAsync()
     {
         await syncGate.WaitAsync(lifetime.Token);
         Busy = true;
@@ -123,14 +162,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         try
         {
             Settings = await store.ReadAsync<WidgetSettings>("settings.bin", true, lifetime.Token) ?? new();
-            Settings.Opacity = double.IsFinite(Settings.Opacity) ? Math.Clamp(Settings.Opacity, .3, 1) : .96;
+            Settings.BackgroundOpacity = double.IsFinite(Settings.BackgroundOpacity) ? Math.Clamp(Settings.BackgroundOpacity, 0, .85) : .14;
             Settings.SyncMinutes = Math.Clamp(Settings.SyncMinutes, 1, 60);
             if (!Enum.IsDefined(Settings.View)) Settings.View = CalendarView.Month;
             if (!Enum.IsDefined(Settings.Behavior)) Settings.Behavior = WindowBehavior.Normal;
             Settings.HiddenCalendars ??= [];
             Changed(""); AppearanceChanged?.Invoke();
             Connected = await provider.IsConnectedAsync(lifetime.Token);
-            snapshot = await store.ReadAsync<CalendarSnapshot>("calendar-cache.bin", true, lifetime.Token) ?? snapshot;
+            if (Connected) snapshot = await store.ReadAsync<CalendarSnapshot>("calendar-cache.bin", true, lifetime.Token) ?? snapshot;
             ReindexEvents();
             ApplyCalendars(); Rebuild();
             await RefreshAsync();
@@ -138,6 +177,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { ReportError(ex); }
+        finally { IsInitialized = true; }
     }
     private async Task RefreshLoopAsync()
     {
@@ -176,6 +216,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             completed = true;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (CalendarAuthorizationException ex)
+        {
+            SettingsOpen = false; Connected = false;
+            snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); Rebuild();
+            await store.DeleteAsync("calendar-cache.bin");
+            Status = ex.Message;
+        }
         catch (Exception ex) { ReportError(ex); }
         finally { Busy = false; syncGate.Release(); }
         if (completed && !lifetime.IsCancellationRequested) await RefreshIfNeededAsync();

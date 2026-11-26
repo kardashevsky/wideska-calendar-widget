@@ -23,6 +23,10 @@ internal static partial class Program
         handler.Forbidden = true;
         try { await provider.GetSnapshotAsync(start, start.AddYears(1), default); Check(false, "Forbidden response must fail"); }
         catch (InvalidOperationException ex) { Check(ex.Message.Contains("403"), "Google API errors must be actionable"); }
+        handler.Forbidden = false;
+        handler.Unauthorized = true;
+        try { await provider.GetSnapshotAsync(start, start.AddYears(1), default); Check(false, "Revoked consent must fail"); }
+        catch (CalendarAuthorizationException) { Check(true, "HTTP 401 must request authorization rather than expose cached events"); }
         await provider.DisconnectAsync(default);
         Check(!await provider.IsConnectedAsync(default), "Disconnect must remove local credentials");
     }
@@ -30,6 +34,7 @@ internal static partial class Program
     {
         public int RefreshRequests, CalendarRequests, EventRequests;
         public bool Forbidden;
+        public bool Unauthorized;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             string path = request.RequestUri!.AbsolutePath;
@@ -40,6 +45,7 @@ internal static partial class Program
             {
                 Check(request.Headers.Authorization?.Parameter == "fresh", "Google requests must use refreshed bearer token");
                 if (Forbidden) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+                if (Unauthorized) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
                 if (path.EndsWith("calendarList"))
                 {
                     CalendarRequests++;

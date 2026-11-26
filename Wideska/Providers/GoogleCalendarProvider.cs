@@ -63,7 +63,9 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
     private async Task<TokenData> ExchangeAsync(Dictionary<string, string> fields, string clientId, string secret, string refresh, CancellationToken token)
     {
         using var response = await http.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(fields), token);
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Google authorization failed ({(int)response.StatusCode}). Check your OAuth settings or reconnect.");
+        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new CalendarAuthorizationException($"Google authorization failed ({(int)response.StatusCode}). Check your Desktop OAuth client and sign in again.");
+        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Google authorization service is unavailable ({(int)response.StatusCode}). Try again shortly.");
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
         var root = document.RootElement;
         return new(root.GetProperty("access_token").GetString()!, root.TryGetProperty("refresh_token", out var r) ? r.GetString()! : refresh,
@@ -71,7 +73,7 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
     }
     private async Task EnsureTokenAsync(CancellationToken token)
     {
-        if (!await IsConnectedAsync(token)) throw new InvalidOperationException("Connect Google Calendar in Settings.");
+        if (!await IsConnectedAsync(token)) throw new CalendarAuthorizationException("Sign in with Google to display your calendar.");
         if (credentials!.Expires > DateTimeOffset.UtcNow) return;
         credentials = await ExchangeAsync(new() { ["client_id"] = credentials.ClientId, ["client_secret"] = credentials.ClientSecret, ["refresh_token"] = credentials.RefreshToken, ["grant_type"] = "refresh_token" }, credentials.ClientId, credentials.ClientSecret, credentials.RefreshToken, token);
         await store.WriteAsync(TokenFile, credentials, true, token);
@@ -123,6 +125,7 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/calendar/v3/" + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials!.AccessToken);
         using var response = await http.SendAsync(request, token);
+        if (response.StatusCode == HttpStatusCode.Unauthorized) throw new CalendarAuthorizationException("Your Google session has expired. Sign in again to display your calendar.");
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Google Calendar returned {(int)response.StatusCode}. Check your connection and account permissions.");
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
     }

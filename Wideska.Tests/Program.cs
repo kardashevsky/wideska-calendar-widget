@@ -85,7 +85,7 @@ internal static partial class Program
             await vm.RefreshAsync();
             // Load actual compiled XAML and render every view, including both themes and minimum dimensions.
             app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Wideska;component/Resources/Styles.xaml") });
-            var window = new Wideska.MainWindow(vm, false);
+            var window = new Wideska.MainWindow(vm, false) { Width = 960, Height = 680 };
             int bindingErrors = 0;
             var listener = new BindingListener(() => bindingErrors++);
             System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add(listener);
@@ -98,7 +98,7 @@ internal static partial class Program
                 desktop.Apply(WindowBehavior.Desktop);
                 Check(!window.Topmost && !window.ShowInTaskbar, "Desktop window behavior");
                 desktop.Apply(WindowBehavior.Normal);
-                Check(!window.Topmost && window.ShowInTaskbar, "Normal window behavior must restore taskbar presence");
+                Check(!window.Topmost && !window.ShowInTaskbar, "A widget must remain absent from the taskbar in normal mode");
             }
             var selector = FindVisual<System.Windows.Controls.ComboBox>(window);
             Check(selector?.SelectedValue is CalendarView, "View selection must bind to the view enum");
@@ -131,7 +131,7 @@ internal static partial class Program
             vm.SettingsOpen = true;
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
-            Check(((SolidColorBrush)app.Resources["Surface"]).Color == (Color)ColorConverter.ConvertFromString("#F8FAFD"), "Light theme must update shared resources");
+            Check(((SolidColorBrush)app.Resources["Surface"]).Color == (Color)ColorConverter.ConvertFromString("#FAF5F3FA"), "Light theme must update shared resources");
             bitmap = new RenderTargetBitmap(960, 680, 96, 96, PixelFormats.Pbgra32); bitmap.Render(window);
             encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using (var output = File.Create(Path.Combine(Path.GetDirectoryName(screenshot)!, "settings-smoke.png"))) encoder.Save(output);
@@ -141,6 +141,7 @@ internal static partial class Program
             await vm.ShutdownAsync();
             var saved = await store.ReadAsync<WidgetSettings>("settings.bin", true);
             Check(saved?.View == CalendarView.Month, "Settings must persist");
+            await TestOnboardingAsync(app, directory);
         }
         finally { Directory.Delete(directory, true); }
     }
@@ -164,12 +165,20 @@ internal static partial class Program
     {
         public int Requests { get; private set; }
         public bool FailRequests { get; set; }
-        public Task<bool> IsConnectedAsync(CancellationToken token) => Task.FromResult(true);
-        public Task ConnectAsync(string id, string secret, CancellationToken token) => Task.CompletedTask;
-        public Task DisconnectAsync(CancellationToken token) => Task.CompletedTask;
+        public bool Connected { get; set; } = true;
+        public bool FailAuthorization { get; set; }
+        public bool SessionExpired { get; set; }
+        public Task<bool> IsConnectedAsync(CancellationToken token) => Task.FromResult(Connected);
+        public Task ConnectAsync(string id, string secret, CancellationToken token)
+        {
+            if (FailAuthorization) throw new CalendarAuthorizationException("Authorization declined");
+            Connected = true; return Task.CompletedTask;
+        }
+        public Task DisconnectAsync(CancellationToken token) { Connected = false; return Task.CompletedTask; }
         public Task<CalendarSnapshot> GetSnapshotAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken token)
         {
             Requests++;
+            if (SessionExpired) throw new CalendarAuthorizationException("Session expired");
             if (FailRequests) throw new HttpRequestException("Offline test");
             var today = new DateTimeOffset(DateTime.Today);
             return Task.FromResult(new CalendarSnapshot([new("work", "Work", "#92ACFF"), new("personal", "Personal", "#67D7B0")],

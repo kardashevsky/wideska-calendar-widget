@@ -29,7 +29,7 @@ public sealed class AsyncCommand(Func<Task> execute, Action<Exception> onError) 
         if (running) return;
         running = true; CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         try { await execute(); }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException ex) { onError(ex); }
         catch (Exception ex) { onError(ex); }
         finally { running = false; CanExecuteChanged?.Invoke(this, EventArgs.Empty); }
     }
