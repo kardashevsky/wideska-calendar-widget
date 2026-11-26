@@ -20,10 +20,10 @@ public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyL
     public string Label => Date.ToString("ddd, d", CultureInfo.CurrentCulture);
     public string Number => Date.Day.ToString(CultureInfo.InvariantCulture);
     public IEnumerable<EventItem> PreviewEvents => Events.Take(1);
-    public string MoreEventsLabel => Events.Count > 1 ? $"+{Events.Count - 1}" : "";
     public string Summary => Events.Count == 0 ? Date.ToString("D") : string.Join("\n", Events.Select(e => $"{e.Time}  {e.Title}"));
 }
 public sealed record MonthItem(string Title, IReadOnlyList<DayCell> Days);
+public sealed record QuarterItem(string Label, string Range, IReadOnlyList<MonthItem> Months);
 public sealed record ViewChoice(CalendarView Value, string Title)
 {
     public override string ToString() => Title;
@@ -55,6 +55,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<CalendarSelection> Calendars { get; } = [];
     public ObservableCollection<DayCell> Days { get; } = [];
     public ObservableCollection<MonthItem> Months { get; } = [];
+    public ObservableCollection<QuarterItem> Quarters { get; } = [];
     public ViewChoice[] Views { get; } = [new(CalendarView.SingleDay, "Day"), new(CalendarView.ThreeDays, "3 days"), new(CalendarView.Workweek, "Workweek"), new(CalendarView.Week, "Week"), new(CalendarView.Month, "Month"), new(CalendarView.Year, "Year")];
     public BehaviorChoice[] Behaviors { get; } = [new(WindowBehavior.Normal, "Normal window"), new(WindowBehavior.AlwaysOnTop, "Always on top"), new(WindowBehavior.Desktop, "Behind other windows")];
     private DateTime anchor = DateTime.Today;
@@ -104,7 +105,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool StartWithWindows { get => Settings.StartWithWindows; set { Settings.StartWithWindows = value; Changed(); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
     public string ClientId { get => Settings.ClientId; set { Settings.ClientId = value; Changed(); Changed(nameof(HasCredentials)); Changed(nameof(CredentialStatus)); } }
     public string ClientSecret { get => Settings.ClientSecret; set { Settings.ClientSecret = value; Changed(); } }
-    public int SyncMinutes { get => Settings.SyncMinutes; set { Settings.SyncMinutes = Math.Clamp(value, 1, 60); Changed(); } }
+    public const int AutoSyncMinutes = 1;
+    public int SyncMinutes => AutoSyncMinutes;
     public event Action? AppearanceChanged;
     public ICommand PreviousCommand { get; }
     public ICommand NextCommand { get; }
@@ -112,7 +114,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ICommand RefreshCommand { get; }
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
-    public ICommand SettingsCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand SelectDayCommand { get; }
     public MainViewModel(LocalStore store, ICalendarProvider provider)
@@ -140,7 +141,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             }
             finally { Busy = false; syncGate.Release(); }
         }, ReportError);
-        SettingsCommand = new RelayCommand(_ => { SettingsOpen = !SettingsOpen; if (!SettingsOpen) _ = SaveSafelyAsync(); });
         SaveSettingsCommand = new AsyncCommand(async () => { await SaveAsync(); SettingsOpen = false; await RefreshAsync(); }, ReportError);
         SelectDayCommand = new RelayCommand(value => { if (value is DateTime date) { followToday = false; anchor = date; if (View == CalendarView.SingleDay) Rebuild(); else View = CalendarView.SingleDay; _ = RefreshIfNeededAsync(); } });
         Rebuild();
@@ -176,7 +176,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             Settings = await store.ReadAsync<WidgetSettings>("settings.bin", true, lifetime.Token) ?? new();
             Settings.BackgroundOpacity = double.IsFinite(Settings.BackgroundOpacity) ? Math.Clamp(Settings.BackgroundOpacity, 0, .85) : .14;
-            Settings.SyncMinutes = Math.Clamp(Settings.SyncMinutes, 1, 60);
+            Settings.SyncMinutes = AutoSyncMinutes;
             if (!Enum.IsDefined(Settings.View)) Settings.View = CalendarView.Month;
             if (!Enum.IsDefined(Settings.Behavior)) Settings.Behavior = WindowBehavior.Normal;
             Settings.HiddenCalendars ??= [];
@@ -215,11 +215,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     private async Task RefreshLoopAsync()
     {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(AutoSyncMinutes));
         try
         {
-            while (!lifetime.IsCancellationRequested)
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
             {
-                await Task.Delay(TimeSpan.FromMinutes(SyncMinutes), lifetime.Token);
                 await RefreshAsync();
             }
         }
@@ -240,7 +240,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ReindexEvents();
             await store.WriteAsync("calendar-cache.bin", snapshot, true, lifetime.Token);
             ApplyCalendars(); Rebuild();
-            Status = $"Updated {snapshot.Updated:t} · {snapshot.Calendars.Count} calendars · {snapshot.Events.Count} events";
+            Status = $"Updated {snapshot.Updated:t}";
             completed = true;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -317,10 +317,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void Rebuild()
     {
         Changed(nameof(Period)); Changed(nameof(IsYear)); Changed(nameof(IsMonth)); Changed(nameof(IsDays)); Changed(nameof(Columns));
-        Days.Clear(); Months.Clear();
+        Days.Clear(); Months.Clear(); Quarters.Clear();
         if (IsYear)
         {
             for (int i = 1; i <= 12; i++) { var month = new DateTime(anchor.Year, i, 1); Months.Add(new(month.ToString("MMMM"), MonthDays(month))); }
+            for (int q = 0; q < 4; q++)
+            {
+                var first = new DateTime(anchor.Year, q * 3 + 1, 1);
+                Quarters.Add(new($"Q{q + 1}", $"{first:MMM} – {first.AddMonths(2):MMM}", Months.Skip(q * 3).Take(3).ToList()));
+            }
         }
         else if (IsMonth) foreach (var day in MonthDays(anchor)) Days.Add(day);
         else

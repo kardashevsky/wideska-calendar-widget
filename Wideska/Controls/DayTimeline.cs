@@ -152,7 +152,7 @@ public sealed class DayTimeline : Control
             foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))
                 Event(dc, item, new Rect(x + 8, DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - 16), 24), false);
             if (day.Events.Count(e => e.AllDay) > allDayRows)
-                Text(dc, $"+{day.Events.Count(e => e.AllDay) - allDayRows} more", x + 12, startY - 18, column - 24, 10, MutedBrush);
+                Text(dc, "More all-day events", x + 12, startY - 18, column - 24, 10, MutedBrush);
             foreach (var item in TimelineLayout.Arrange(day.Events))
             {
                 double laneWidth = Math.Max(1, (column - 16) / item.LaneCount);

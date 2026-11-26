@@ -16,7 +16,7 @@ public sealed class WidgetSettings
     public bool StartWithWindows { get; set; }
     public WindowBehavior Behavior { get; set; }
     public CalendarView View { get; set; } = CalendarView.Month;
-    public int SyncMinutes { get; set; } = 5;
+    public int SyncMinutes { get; set; } = 1;
     public string ClientId { get; set; } = "";
     public string ClientSecret { get; set; } = "";
     public List<string> HiddenCalendars { get; set; } = [];

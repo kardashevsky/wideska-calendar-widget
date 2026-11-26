@@ -165,9 +165,7 @@
                 <Button x:Name="DayNumber" Content="{Binding Number}" Width="24" Height="24" FontSize="12" HorizontalAlignment="Center" Padding="0" Margin="0,0,0,2" BorderThickness="0" Command="{Binding DataContext.SelectDayCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Date}" ToolTip="{Binding Summary}"/>
                 <Ellipse x:Name="EventDot" Width="3" Height="3" Fill="{DynamicResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24,1,0,0"/>
                 <Grid x:Name="Preview" Grid.Row="1" VerticalAlignment="Top">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <ItemsControl ItemsSource="{Binding PreviewEvents}" ItemTemplate="{StaticResource CompactEventTemplate}"/>
-                    <TextBlock Grid.Column="1" Text="{Binding MoreEventsLabel}" FontSize="9" Foreground="{DynamicResource Muted}" Margin="2,5,1,0"/>
                 </Grid>
             </Grid>
         </Border>
@@ -188,4 +186,25 @@
     <Style TargetType="Thumb">
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Thumb"><Border Background="#01000000"/></ControlTemplate></Setter.Value></Setter>
     </Style>
+    <DataTemplate x:Key="YearMonthTemplate">
+        <Border Margin="1,0" Padding="2,0">
+            <StackPanel>
+                <TextBlock Text="{Binding Title}" FontWeight="Medium" FontSize="12" Margin="0,0,0,6" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                <UniformGrid Columns="7" Margin="0,0,0,4">
+                    <TextBlock Text="M" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="T" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="W" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="T" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="F" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="S" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="S" FontSize="9" HorizontalAlignment="Center"/>
+                </UniformGrid>
+                <ItemsControl ItemsSource="{Binding Days}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                        <Button x:Name="MiniDay" Content="{Binding Number}" Padding="0,1" Margin="0" FontSize="10" BorderBrush="{DynamicResource Line}" Command="{Binding DataContext.SelectDayCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Date}" ToolTip="{Binding Summary}"/>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding InMonth}" Value="False"><Setter TargetName="MiniDay" Property="Opacity" Value="0.25"/></DataTrigger>
+                            <DataTrigger Binding="{Binding Today}" Value="True"><Setter TargetName="MiniDay" Property="Background" Value="{DynamicResource AccentFill}"/><Setter TargetName="MiniDay" Property="Foreground" Value="White"/></DataTrigger>
+                            <DataTrigger Binding="{Binding Events.Count}" Value="0"><Setter TargetName="MiniDay" Property="BorderBrush" Value="Transparent"/></DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
 </ResourceDictionary>
