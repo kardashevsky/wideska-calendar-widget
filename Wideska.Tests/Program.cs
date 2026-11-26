@@ -99,6 +99,7 @@ internal static partial class Program
                 Check(!window.Topmost && !window.ShowInTaskbar, "Desktop window behavior");
                 desktop.Apply(WindowBehavior.Normal);
                 Check(!window.Topmost && !window.ShowInTaskbar, "A widget must remain absent from the taskbar in normal mode");
+                await TestTrayAsync(app, window, desktop);
             }
             var selector = FindVisual<System.Windows.Controls.ComboBox>(window);
             Check(selector?.SelectedValue is CalendarView, "View selection must bind to the view enum");
