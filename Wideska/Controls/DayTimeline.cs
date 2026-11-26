@@ -194,8 +194,7 @@ public sealed class DayTimeline : Control
         }
         else
         {
-            // A colored top edge marks the exact event start; inset rails separate adjacent cards.
-            dc.DrawLine(new Pen(color, 2), new Point(rect.X + radius, rect.Y + 1), new Point(Math.Max(rect.X + radius, rect.Right - radius), rect.Y + 1));
+            // Keep the strong calendar-color accent inside the side of the card.
             if (rect.Height > 20)
                 dc.DrawRoundedRectangle(color, null, new Rect(rect.X + 4, rect.Y + 9, 3, Math.Max(2, rect.Height - 18)), 1.5, 1.5);
             string start = TimeSpan.FromMinutes(Math.Clamp(item.StartMinute, 0, 1440)).ToString(@"hh\:mm");
