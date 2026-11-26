@@ -1,5 +1,6 @@
 using Wideska.Models;
 namespace Wideska.Providers;
+public sealed class CalendarAuthorizationException(string message) : InvalidOperationException(message);
 public interface ICalendarProvider : IDisposable
 {
     Task<bool> IsConnectedAsync(CancellationToken token);

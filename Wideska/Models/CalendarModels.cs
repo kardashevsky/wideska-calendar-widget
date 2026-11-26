@@ -6,9 +6,9 @@ public sealed class WidgetSettings
 {
     public double Left { get; set; } = 100;
     public double Top { get; set; } = 100;
-    public double Width { get; set; } = 960;
-    public double Height { get; set; } = 680;
-    public double Opacity { get; set; } = 0.96;
+    public double Width { get; set; } = 720;
+    public double Height { get; set; } = 560;
+    public double BackgroundOpacity { get; set; } = 0.14;
     public bool DarkTheme { get; set; } = true;
     public bool StartWithWindows { get; set; }
     public WindowBehavior Behavior { get; set; }

@@ -46,7 +46,7 @@ public sealed class DesktopIntegration : IDisposable
     {
         desktop = behavior == WindowBehavior.Desktop;
         window.Topmost = behavior == WindowBehavior.AlwaysOnTop;
-        window.ShowInTaskbar = !desktop;
+        window.ShowInTaskbar = false;
         SetWindowPos(icon.Window, new IntPtr(desktop ? 1 : behavior == WindowBehavior.AlwaysOnTop ? -1 : -2), 0, 0, 0, 0, 0x13);
     }
     public void Show()

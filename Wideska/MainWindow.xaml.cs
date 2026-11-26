@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -17,6 +19,7 @@ public partial class MainWindow : Window
     private bool initialized;
     private bool quitting;
     private bool? appliedStartup;
+    private bool? widgetDisplayed;
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     public MainWindow() : this(CreateViewModel(), true) { }
     private static MainViewModel CreateViewModel()
@@ -50,11 +53,6 @@ public partial class MainWindow : Window
             desktop.QuitRequested += Quit;
             await model.InitializeAsync();
             if (quitting) return;
-            var settings = model.Settings;
-            Width = double.IsFinite(settings.Width) ? Math.Clamp(settings.Width, MinWidth, SystemParameters.VirtualScreenWidth) : 960;
-            Height = double.IsFinite(settings.Height) ? Math.Clamp(settings.Height, MinHeight, SystemParameters.VirtualScreenHeight) : 680;
-            Left = double.IsFinite(settings.Left) ? Math.Clamp(settings.Left, SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 100) : 100;
-            Top = double.IsFinite(settings.Top) ? Math.Clamp(settings.Top, SystemParameters.VirtualScreenTop, SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 60) : 100;
             initialized = true;
             ApplyAppearance();
         }
@@ -65,29 +63,76 @@ public partial class MainWindow : Window
         bool dark = model.DarkTheme;
         var colors = new Dictionary<string, string>
         {
-            ["Surface"] = dark ? "#171C26" : "#F8FAFD", ["Panel"] = dark ? "#202735" : "#EDF1F8",
-            ["Text"] = dark ? "#EDF1F8" : "#202B3E", ["Muted"] = dark ? "#9AA9BE" : "#586A82",
-            ["Line"] = dark ? "#323E51" : "#D5DEEB", ["Accent"] = dark ? "#92ACFF" : "#355FBC"
+            ["Surface"] = dark ? "#FA1A1D29" : "#FAF5F3FA", ["Panel"] = dark ? "#FF2C3042" : "#FFE7E2F0",
+            ["Text"] = dark ? "#FFF5F3FF" : "#FF252036", ["Muted"] = dark ? "#FFC1BED5" : "#FF605874",
+            ["Line"] = dark ? "#24FFFFFF" : "#24252036", ["Accent"] = dark ? "#FFC4B5FD" : "#FF6B46B0",
+            ["AccentFill"] = dark ? "#FF8B72DB" : "#FF7655BE"
         };
         foreach (var pair in colors) Application.Current.Resources[pair.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));
-        Opacity = model.Opacity;
-        desktop?.Apply(model.Behavior);
+        var tint = (Color)ColorConverter.ConvertFromString(dark ? "#101420" : "#F5F3FA");
+        tint.A = (byte)Math.Round(model.BackgroundOpacity * 255);
+        Application.Current.Resources["WidgetGlass"] = new SolidColorBrush(tint);
+        // Only the glass brush is translucent; content and controls retain full opacity.
+        Opacity = 1;
+        desktop?.Apply(model.ShowWidget ? model.Behavior : Models.WindowBehavior.Normal);
+        if (initialized && widgetDisplayed != model.ShowWidget)
+        {
+            geometryTimer.Stop();
+            if (widgetDisplayed == true) CaptureGeometry();
+            widgetDisplayed = model.ShowWidget;
+            ApplyPresentationBounds();
+        }
         if (initialized && appliedStartup != model.StartWithWindows)
         {
             try { DesktopIntegration.SetStartup(model.StartWithWindows); appliedStartup = model.StartWithWindows; }
             catch (Exception ex) { model.ReportError(ex); }
         }
     }
+    private void ApplyPresentationBounds()
+    {
+        if (model.ShowWidget)
+        {
+            var settings = model.Settings;
+            Width = double.IsFinite(settings.Width) ? Math.Clamp(settings.Width, MinWidth, Math.Max(MinWidth, SystemParameters.VirtualScreenWidth)) : 720;
+            Height = double.IsFinite(settings.Height) ? Math.Clamp(settings.Height, MinHeight, Math.Max(MinHeight, SystemParameters.VirtualScreenHeight)) : 560;
+            Left = double.IsFinite(settings.Left) ? Math.Clamp(settings.Left, SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 100) : 100;
+            Top = double.IsFinite(settings.Top) ? Math.Clamp(settings.Top, SystemParameters.VirtualScreenTop, SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 60) : 100;
+        }
+        else
+        {
+            var work = SystemParameters.WorkArea;
+            Width = Math.Min(480, work.Width); Height = Math.Min(720, work.Height);
+            Left = work.Left + (work.Width - Width) / 2; Top = work.Top + (work.Height - Height) / 2;
+        }
+    }
+    private async void OnImportCredentials(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Import Google Desktop OAuth client", Filter = "Google OAuth JSON (*.json)|*.json", Multiselect = false };
+        if (dialog.ShowDialog(this) != true) return;
+        try { await model.ImportCredentialsAsync(dialog.FileName); }
+        catch (Exception ex) { model.ReportError(ex); }
+    }
+    private void OnOpenGoogleCloud(object sender, RoutedEventArgs e) => OpenLink("https://console.cloud.google.com/apis/library/calendar-json.googleapis.com");
+    private void OnOpenGoogleGuide(object sender, RoutedEventArgs e) => OpenLink("https://developers.google.com/workspace/calendar/api/quickstart/python#authorize_credentials_for_a_desktop_application");
+    private void OpenLink(string address)
+    {
+        try { Process.Start(new ProcessStartInfo(address) { UseShellExecute = true }); }
+        catch (Exception ex) { model.ReportError(ex); }
+    }
+    private void OnResize(object sender, DragDeltaEventArgs e)
+    {
+        Width = Math.Clamp(ActualWidth + e.HorizontalChange, MinWidth, Math.Max(MinWidth, SystemParameters.VirtualScreenWidth));
+        Height = Math.Clamp(ActualHeight + e.VerticalChange, MinHeight, Math.Max(MinHeight, SystemParameters.VirtualScreenHeight));
+    }
     private void OnDrag(object sender, MouseButtonEventArgs e)
     {
         DependencyObject? source = e.OriginalSource as DependencyObject;
         while (source is not null && !ReferenceEquals(source, sender))
         {
-            if (source is System.Windows.Controls.Primitives.ButtonBase) return;
+            if (source is ButtonBase or System.Windows.Controls.ComboBox or System.Windows.Controls.TextBox) return;
             source = source is Visual ? VisualTreeHelper.GetParent(source) : LogicalTreeHelper.GetParent(source);
         }
-        if (e.ClickCount == 2) WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-        else if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+        if (e.LeftButton == MouseButtonState.Pressed) DragMove();
     }
     private void OnHide(object sender, RoutedEventArgs e) { if (desktop is not null) Hide(); }
     private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized && desktop is not null) Hide(); }
@@ -99,13 +144,13 @@ public partial class MainWindow : Window
     private void OnQuit(object sender, RoutedEventArgs e) => Quit();
     private void QueueGeometrySave()
     {
-        if (!initialized || quitting) return;
+        if (!initialized || quitting || !model.ShowWidget) return;
         geometryTimer.Stop(); geometryTimer.Start();
     }
     private void CaptureGeometry()
     {
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, ActualWidth, ActualHeight) : RestoreBounds;
-        if (bounds.IsEmpty) return;
+        if (bounds.IsEmpty || widgetDisplayed != true) return;
         model.Settings.Left = bounds.Left; model.Settings.Top = bounds.Top; model.Settings.Width = bounds.Width; model.Settings.Height = bounds.Height;
     }
     private async void Quit()
