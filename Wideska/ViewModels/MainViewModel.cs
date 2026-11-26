@@ -18,6 +18,7 @@ public sealed record EventItem(string Title, string Time, string Color, string D
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
     public string Label => Date.ToString("ddd, d", CultureInfo.CurrentCulture);
+    public bool IsWeekend => Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     public string Number => Date.Day.ToString(CultureInfo.InvariantCulture);
     public IEnumerable<EventItem> PreviewEvents => Events.Take(1);
     public string Summary => Events.Count == 0 ? Date.ToString("D") : string.Join("\n", Events.Select(e => $"{e.Time}  {e.Title}"));
@@ -45,6 +46,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private DateTimeOffset clockTime = DateTimeOffset.UtcNow;
     public string ClockText => CalendarTime.Local(clockTime, CalendarTimeZoneId).ToString("HH:mm:ss", CultureInfo.CurrentCulture);
     public string DayHeading => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(anchor.ToString("dddd, d", CultureInfo.CurrentCulture));
+    public bool IsWeekendHeading => anchor.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     public bool IsSingleDay => View == CalendarView.SingleDay;
     private DateTimeOffset currentTime = DateTimeOffset.UtcNow;
     public DateTimeOffset CurrentTime => currentTime;
@@ -338,7 +340,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void Rebuild()
     {
         Changed(nameof(Period)); Changed(nameof(IsYear)); Changed(nameof(IsMonth)); Changed(nameof(IsDays)); Changed(nameof(Columns));
-        Changed(nameof(DayHeading)); Changed(nameof(IsSingleDay)); UpdateClockSchedule();
+        Changed(nameof(DayHeading)); Changed(nameof(IsWeekendHeading)); Changed(nameof(IsSingleDay)); UpdateClockSchedule();
         Days.Clear(); Months.Clear(); Quarters.Clear();
         if (IsYear)
         {
