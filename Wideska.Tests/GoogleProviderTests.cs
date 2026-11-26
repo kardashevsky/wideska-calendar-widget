@@ -18,6 +18,7 @@ internal static partial class Program
         Check(result.Events[0].AllDay && result.Events[0].End.Day == 27, "Google all-day dates must preserve exclusive end");
         Check(result.Events[1].Title == "(Untitled)", "Missing event titles must have a fallback");
         Check(result.RangeStart == start, "Cache coverage must match requested interval");
+        Check(result.Calendars[0].TimeZoneId == "America/New_York" && result.Calendars[0].IsPrimary, "Calendar API metadata must supply primary calendar and IANA time zone");
         var token = await store.ReadAsync<GoogleCalendarProvider.TokenData>("google-token.bin", true);
         Check(token?.AccessToken == "fresh" && token.RefreshToken == "refresh", "Refresh must preserve and encrypt refresh token");
         handler.Forbidden = true;
@@ -49,7 +50,7 @@ internal static partial class Program
                 if (path.EndsWith("calendarList"))
                 {
                     CalendarRequests++;
-                    json = request.RequestUri.Query.Contains("pageToken") ? """{"items":[]}""" : """{"items":[{"id":"work","summary":"Work","backgroundColor":"#92ACFF"}],"nextPageToken":"page2"}""";
+                    json = request.RequestUri.Query.Contains("pageToken") ? """{"items":[]}""" : """{"items":[{"id":"work","summary":"Work","backgroundColor":"#92ACFF","timeZone":"America/New_York","primary":true}],"nextPageToken":"page2"}""";
                 }
                 else
                 {

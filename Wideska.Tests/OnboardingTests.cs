@@ -90,6 +90,10 @@ internal static partial class Program
         var grip = (System.Windows.Controls.Primitives.Thumb)window.FindName("ResizeGrip");
         grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(40, 20) { RoutedEvent = System.Windows.Controls.Primitives.Thumb.DragDeltaEvent });
         Check(window.Width == 760 && window.Height == 580, "Corner grip must resize a transparent frameless window");
+        vm.GeometryLocked = true;
+        grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(40, 20) { RoutedEvent = System.Windows.Controls.Primitives.Thumb.DragDeltaEvent });
+        Check(window.Width == 760 && window.Height == 580 && !vm.CanEditGeometry, "Geometry lock must prevent resize gestures");
+        vm.GeometryLocked = false;
         window.Width = 720; window.Height = 560;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         SavePreview(window, "widget-transparent");
