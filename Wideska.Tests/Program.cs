@@ -79,6 +79,8 @@ internal static partial class Program
             vm.TodayCommand.Execute(null);
             vm.View = CalendarView.Year;
             Check(vm.Months.Count == 12 && vm.Months.All(m => m.Days.Count == 42), "Year must contain twelve complete month grids");
+            Check(vm.Quarters.Count == 4 && vm.Quarters.All(q => q.Months.Count == 3) && vm.Quarters.SelectMany(q => q.Months).SequenceEqual(vm.Months), "Year must group chronological months into four quarters for a two-by-six layout");
+            Check(vm.Quarters.Select(q => q.Label).SequenceEqual(new[] { "Q1", "Q2", "Q3", "Q4" }), "Quarter labels must identify each group");
             vm.SelectDayCommand.Execute(new DateTime(2028, 2, 29));
             Check(vm.View == CalendarView.SingleDay && vm.Days[0].Date.Day == 29, "Leap-day navigation");
             vm.TodayCommand.Execute(null);

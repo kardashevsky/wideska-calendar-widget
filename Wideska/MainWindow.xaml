@@ -18,11 +18,7 @@
                         <Image Source="Resources/Icons/Wideska.png" Width="20" Height="20" Margin="0,0,8,0"/>
                         <TextBlock Text="W I D E S K A" Style="{StaticResource Caption}" FontSize="10"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Style="{StaticResource QuietControls}">
-                        <Button Style="{StaticResource IconButton}" Content="&#xE895;" Command="{Binding RefreshCommand}" ToolTip="Sync calendars" AutomationProperties.Name="Sync calendars"/>
-                        <Button Style="{StaticResource IconButton}" Content="&#xE713;" Command="{Binding SettingsCommand}" ToolTip="Widget settings" AutomationProperties.Name="Widget settings"/>
-                        <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" Click="OnHide" ToolTip="Hide to tray" AutomationProperties.Name="Hide to tray"/>
-                    </StackPanel>
+
                 </Grid>
                 <Grid Grid.Row="1" Margin="0,0,0,18" Background="Transparent" MouseLeftButtonDown="OnDrag">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -55,24 +51,21 @@
                     <ScrollViewer Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                         <controls:DayTimeline x:Name="Timeline" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
-                    <ScrollViewer Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl ItemsSource="{Binding Months}">
-                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ScrollViewer Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="YearCalendar" ItemsSource="{Binding Quarters}" MinWidth="648">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" Rows="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <Border Width="205" Margin="0,0,12,18" Padding="4"><StackPanel>
-                                    <TextBlock Text="{Binding Title}" FontWeight="Medium" FontSize="14" Margin="0,0,0,10"/>
-                                    <UniformGrid Columns="7" Margin="0,0,0,5"><TextBlock Text="M" Style="{StaticResource Caption}"/><TextBlock Text="T" Style="{StaticResource Caption}"/><TextBlock Text="W" Style="{StaticResource Caption}"/><TextBlock Text="T" Style="{StaticResource Caption}"/><TextBlock Text="F" Style="{StaticResource Caption}"/><TextBlock Text="S" Style="{StaticResource Caption}"/><TextBlock Text="S" Style="{StaticResource Caption}"/></UniformGrid>
-                                    <ItemsControl ItemsSource="{Binding Days}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate><DataTemplate>
-                                            <Button x:Name="MiniDay" Content="{Binding Number}" Padding="1,4" Margin="0" FontSize="11" BorderBrush="{DynamicResource Line}" Command="{Binding DataContext.SelectDayCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Date}" ToolTip="{Binding Events.Count, StringFormat={}{0} events}"/>
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding InMonth}" Value="False"><Setter TargetName="MiniDay" Property="Opacity" Value="0.25"/></DataTrigger>
-                                                <DataTrigger Binding="{Binding Today}" Value="True"><Setter TargetName="MiniDay" Property="Background" Value="{DynamicResource AccentFill}"/><Setter TargetName="MiniDay" Property="Foreground" Value="White"/></DataTrigger>
-                                                <DataTrigger Binding="{Binding Events.Count}" Value="0"><Setter TargetName="MiniDay" Property="BorderBrush" Value="Transparent"/></DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate></ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel></Border>
+                                <Border Margin="4" Padding="8" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="14">
+                                    <StackPanel>
+                                        <DockPanel Margin="2,0,2,8">
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Range}" Style="{StaticResource Caption}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                            <Border Background="{DynamicResource Panel}" CornerRadius="7" Padding="8,4" HorizontalAlignment="Left"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" FontSize="11"/></Border>
+                                        </DockPanel>
+                                        <ItemsControl ItemsSource="{Binding Months}" ItemTemplate="{StaticResource YearMonthTemplate}">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
@@ -100,10 +93,9 @@
                         <TextBlock Text="{Binding CalendarTimeZoneLabel}" Style="{StaticResource Caption}"/>
                         <TextBlock Text="CALENDARS" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
                         <ItemsControl ItemsSource="{Binding Calendars}"><ItemsControl.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding Visible}"><StackPanel Orientation="Horizontal"><Ellipse Width="7" Height="7" Fill="{Binding Calendar.Color}" Margin="0,0,8,0"/><TextBlock Text="{Binding Calendar.Name}" MaxWidth="240"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                        <TextBlock Text="Sync interval, minutes (1–60)" Margin="0,16,0,0"/><TextBox Text="{Binding SyncMinutes}"/>
+                        <TextBlock Text="Syncs automatically every minute." Style="{StaticResource Caption}" Margin="0,16,0,8"/>
                         <Button Content="Disconnect Google account" Command="{Binding DisconnectCommand}" HorizontalAlignment="Left"/>
                         <TextBlock Text="Drag the month heading to move. Drag any edge or corner to resize. Find the widget again in the system tray." Style="{StaticResource Caption}" Margin="0,12"/>
-                        <Button Content="Quit widget" Click="OnQuit" HorizontalAlignment="Left" Foreground="{DynamicResource Muted}"/>
                     </StackPanel></ScrollViewer>
                 </Border>
             </Grid>
@@ -114,7 +106,6 @@
             <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                 <DockPanel Background="Transparent" MouseLeftButtonDown="OnDrag">
-                    <Button DockPanel.Dock="Right" Content="&#xE8BB;" Style="{StaticResource IconButton}" Click="OnQuit" ToolTip="Quit Wideska" AutomationProperties.Name="Quit Wideska"/>
                     <TextBlock Text="W I D E S K A" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
                 </DockPanel>
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">

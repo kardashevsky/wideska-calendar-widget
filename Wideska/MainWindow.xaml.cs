@@ -188,14 +188,12 @@ public partial class MainWindow : Window
         desktop.Host.SetBounds(b with { X = b.X + (int)Math.Round(current.X - previous.X), Y = b.Y + (int)Math.Round(current.Y - previous.Y) });
         dragPoint = current;
     }
-    private void OnHide(object sender, RoutedEventArgs e) { if (desktop is not null) Hide(); }
     private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized && desktop is not null) Hide(); }
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         if (!enableDesktopIntegration) return;
         if (!quitting) { e.Cancel = true; if (desktop is not null) Hide(); else Quit(); }
     }
-    private void OnQuit(object sender, RoutedEventArgs e) => Quit();
     private void QueueGeometrySave()
     {
         if (!initialized || quitting || !model.ShowWidget) return;

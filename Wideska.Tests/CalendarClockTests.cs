@@ -7,10 +7,12 @@ internal static partial class Program
     private static async Task TestCalendarClockAndPersistenceAsync(string path)
     {
         var store = new LocalStore(path);
+        await store.WriteAsync("settings.bin", new WidgetSettings { SyncMinutes = 17 }, true);
         var provider = new ClockProvider();
         using (var vm = new MainViewModel(store, provider))
         {
             await vm.InitializeAsync(); vm.View = CalendarView.SingleDay;
+            Check(vm.SyncMinutes == 1 && vm.Settings.SyncMinutes == 1, "Existing sync preferences must migrate to automatic one-minute synchronization");
             vm.UpdateCurrentTime(DateTimeOffset.Parse("2026-01-01T23:59Z")); vm.TodayCommand.Execute(null);
             Check(vm.CalendarTimeZoneId == "Asia/Tokyo" && vm.Days[0].Date == new DateTime(2026,1,2), "Today must follow primary calendar time zone rather than Windows date");
             var timed = vm.Days[0].Events.Single(e => !e.AllDay);
