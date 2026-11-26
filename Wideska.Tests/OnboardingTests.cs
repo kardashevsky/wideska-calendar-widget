@@ -12,6 +12,7 @@ internal static partial class Program
 {
     private static void SavePreview(Window window, string name, bool wallpaper = false)
     {
+        window.UpdateLayout();
         int width = (int)window.ActualWidth;
         int height = (int)window.ActualHeight;
         var image = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
@@ -98,6 +99,10 @@ internal static partial class Program
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         SavePreview(window, "widget-transparent");
         SavePreview(window, "widget-wallpaper", true);
+        vm.View = CalendarView.SingleDay;
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        SavePreview(window, "day-heading", true);
+        vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         SavePreview(window, "widget-small", true);

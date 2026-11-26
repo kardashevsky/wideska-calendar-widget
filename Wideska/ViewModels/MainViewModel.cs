@@ -40,6 +40,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly SemaphoreSlim syncGate = new(1, 1);
     private Task? refreshLoop;
     private readonly DispatcherTimer minuteTimer = new();
+    private readonly DispatcherTimer secondTimer = new();
+    private bool clockVisible;
+    private DateTimeOffset clockTime = DateTimeOffset.UtcNow;
+    public string ClockText => CalendarTime.Local(clockTime, CalendarTimeZoneId).ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+    public string DayHeading => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(anchor.ToString("dddd, d", CultureInfo.CurrentCulture));
+    public bool IsSingleDay => View == CalendarView.SingleDay;
     private DateTimeOffset currentTime = DateTimeOffset.UtcNow;
     public DateTimeOffset CurrentTime => currentTime;
     public string CalendarTimeZoneId => (snapshot.Calendars.FirstOrDefault(c => c.Id == Settings.TimeZoneCalendarId) ?? snapshot.Calendars.FirstOrDefault(c => c.IsPrimary) ?? snapshot.Calendars.FirstOrDefault())?.TimeZoneId ?? "";
@@ -84,12 +90,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         Changed(nameof(ShowWidget)); Changed(nameof(ShowAuthorization));
         Changed(nameof(CanEditGeometry));
+        UpdateClockSchedule();
         AppearanceChanged?.Invoke();
     }
     public string ConnectionLabel => Connected ? "Google Calendar connected" : "No account connected";
     private bool settingsOpen;
     public bool SettingsOpen { get => settingsOpen; set => Set(ref settingsOpen, value); }
-    public string Period => View == CalendarView.Year ? anchor.ToString("yyyy") : anchor.ToString("MMMM yyyy");
+    public string Period => View == CalendarView.Year ? anchor.ToString("yyyy") : CultureInfo.CurrentCulture.TextInfo.ToTitleCase(anchor.ToString("MMMM yyyy"));
     public bool IsYear => View == CalendarView.Year;
     public bool IsMonth => View == CalendarView.Month;
     public bool IsDays => !IsYear && !IsMonth;
@@ -121,6 +128,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         this.store = store; this.provider = provider;
         FitDesktopCommand = new RelayCommand(_ => { if (!GeometryLocked) FitDesktopRequested?.Invoke(); });
         minuteTimer.Tick += (_, _) => { UpdateCurrentTime(DateTimeOffset.UtcNow); ScheduleMinute(); };
+        secondTimer.Tick += (_, _) => { clockTime = DateTimeOffset.UtcNow; Changed(nameof(ClockText)); AlignClockTick(); };
         PreviousCommand = new RelayCommand(_ => Navigate(-1));
         NextCommand = new RelayCommand(_ => Navigate(1));
         TodayCommand = new RelayCommand(_ => { followToday = true; anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date; Rebuild(); _ = RefreshIfNeededAsync(); });
@@ -204,14 +212,27 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         DateTime before = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
         currentTime = now; Changed(nameof(CurrentTime));
+        clockTime = now; Changed(nameof(ClockText));
         DateTime today = CalendarTime.Local(now, CalendarTimeZoneId).Date;
         if (before != today) { if (followToday) anchor = today; Rebuild(); }
     }
     private void UpdateTimeZone()
     {
         Changed(nameof(CalendarTimeZoneId)); Changed(nameof(CalendarTimeZoneLabel));
+        Changed(nameof(ClockText));
         if (followToday) anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
         ReindexEvents(); Rebuild();
+    }
+    public void SetClockVisible(bool visible) { clockVisible = visible; UpdateClockSchedule(); }
+    private void UpdateClockSchedule()
+    {
+        if (!clockVisible || !ShowWidget || !IsSingleDay || lifetime.IsCancellationRequested) { secondTimer.Stop(); return; }
+        clockTime = DateTimeOffset.UtcNow; Changed(nameof(ClockText)); AlignClockTick();
+    }
+    private void AlignClockTick()
+    {
+        secondTimer.Interval = TimeSpan.FromMilliseconds(1000 - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1000);
+        secondTimer.Start();
     }
     private async Task RefreshLoopAsync()
     {
@@ -317,6 +338,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void Rebuild()
     {
         Changed(nameof(Period)); Changed(nameof(IsYear)); Changed(nameof(IsMonth)); Changed(nameof(IsDays)); Changed(nameof(Columns));
+        Changed(nameof(DayHeading)); Changed(nameof(IsSingleDay)); UpdateClockSchedule();
         Days.Clear(); Months.Clear(); Quarters.Clear();
         if (IsYear)
         {
@@ -340,11 +362,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public async Task ShutdownAsync()
     {
         minuteTimer.Stop();
+        secondTimer.Stop();
         lifetime.Cancel();
         if (refreshLoop is not null) await refreshLoop;
         await syncGate.WaitAsync();
         try { await SaveAsync(); }
         finally { syncGate.Release(); }
     }
-    public void Dispose() { minuteTimer.Stop(); lifetime.Cancel(); provider.Dispose(); lifetime.Dispose(); }
+    public void Dispose() { minuteTimer.Stop(); secondTimer.Stop(); lifetime.Cancel(); provider.Dispose(); lifetime.Dispose(); }
 }

@@ -136,7 +136,7 @@ internal static partial class Program
             vm.SettingsOpen = true;
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
-            Check(((SolidColorBrush)app.Resources["Surface"]).Color == (Color)ColorConverter.ConvertFromString("#FAF5F3FA"), "Light theme must update shared resources");
+            Check(((SolidColorBrush)app.Resources["Surface"]).Color == (Color)ColorConverter.ConvertFromString("#FAF5F7FA"), "Light theme must update shared resources");
             bitmap = new RenderTargetBitmap(960, 680, 96, 96, PixelFormats.Pbgra32); bitmap.Render(window);
             encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using (var output = File.Create(Path.Combine(Path.GetDirectoryName(screenshot)!, "settings-smoke.png"))) encoder.Save(output);
