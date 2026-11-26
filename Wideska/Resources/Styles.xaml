@@ -9,6 +9,26 @@
     <SolidColorBrush x:Key="AccentFill" Color="#FF8B72DB"/>
     <BooleanToVisibilityConverter x:Key="VisibleIf"/>
     <converters:CompactHeightConverter x:Key="CompactHeight"/>
+    <Style x:Key="TrayContextMenu" TargetType="ContextMenu">
+        <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu">
+            <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="8" Padding="5">
+                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+            </Border>
+        </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="TrayMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem">
+            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="5" Padding="14,9,20,9">
+                <TextBlock Text="{TemplateBinding Header}" Foreground="{TemplateBinding Foreground}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Panel}"/></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ItemBorder" Property="Opacity" Value="0.4"/></Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource Text}"/>
         <Setter Property="TextWrapping" Value="Wrap"/>

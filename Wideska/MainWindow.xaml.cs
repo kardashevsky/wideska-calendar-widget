@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private DesktopIntegration? desktop;
     private readonly bool enableDesktopIntegration;
     private bool initialized;
+    private bool loadStarted;
     private bool quitting;
     private bool? appliedStartup;
     private bool? widgetDisplayed;
@@ -46,11 +47,15 @@ public partial class MainWindow : Window
     }
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        if (loadStarted) return;
+        loadStarted = true;
         if (!enableDesktopIntegration) { ApplyAppearance(); return; }
         try
         {
             desktop = new DesktopIntegration(this);
             desktop.QuitRequested += Quit;
+            desktop.SettingsRequested += () => model.SettingsOpen = model.ShowWidget;
+            desktop.SyncRequested += () => model.RefreshCommand.Execute(null);
             await model.InitializeAsync();
             if (quitting) return;
             initialized = true;
