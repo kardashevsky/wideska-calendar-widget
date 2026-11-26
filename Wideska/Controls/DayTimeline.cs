@@ -22,19 +22,27 @@ public sealed class DayTimeline : Control
     private readonly List<(Rect Bounds, string Details)> hits = [];
     private INotifyCollectionChanged? observed;
     private string? hover;
+    private readonly ToolTip eventToolTip = new();
     private bool scrollPending;
     public DayTimeline()
     {
         MinHeight = 780;
         Loaded += (_, _) => { Observe(); ScheduleScroll(); };
-        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); };
-        Unloaded += (_, _) => { if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; };
+        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
+        Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; };
+        MouseLeave += (_, _) => ClearHover();
         MouseMove += (_, e) =>
         {
             string? details = hits.LastOrDefault(h => h.Bounds.Contains(e.GetPosition(this))).Details;
             if (details == hover) return;
-            hover = details; ToolTip = details;
+            if (details is null) { ClearHover(); return; }
+            hover = details; eventToolTip.Content = details; ToolTip = eventToolTip;
         };
+    }
+    private void ClearHover()
+    {
+        eventToolTip.IsOpen = false; eventToolTip.Content = null;
+        ToolTip = null; hover = null;
     }
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((DayTimeline)d).Observe();
     private void Observe()
@@ -44,7 +52,7 @@ public sealed class DayTimeline : Control
         if (observed is not null) observed.CollectionChanged += CollectionChanged;
         InvalidateVisual();
     }
-    private void CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) { InvalidateVisual(); ScheduleScroll(); }
+    private void CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) { ClearHover(); InvalidateVisual(); ScheduleScroll(); }
     private void ScheduleScroll()
     {
         if (scrollPending || !IsLoaded || !IsVisible) return;
