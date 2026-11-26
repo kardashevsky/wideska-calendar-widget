@@ -11,6 +11,25 @@
     <converters:CompactHeightConverter x:Key="CompactHeight"/>
     <converters:TimelineWidthConverter x:Key="TimelineWidth"/>
     <converters:TimelineHeightConverter x:Key="TimelineHeight"/>
+    <Style TargetType="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource Panel}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+        <Setter Property="Padding" Value="12,9"/>
+        <Setter Property="MaxWidth" Value="340"/>
+        <Setter Property="MaxHeight" Value="240"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="HasDropShadow" Value="False"/>
+        <Setter Property="ContentTemplate"><Setter.Value><DataTemplate>
+            <TextBlock Text="{Binding}" Foreground="{DynamicResource Text}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxWidth="310" MaxHeight="215" FontSize="12"/>
+        </DataTemplate></Setter.Value></Setter>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToolTip">
+            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                <ContentPresenter/>
+            </Border>
+        </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="TrayContextMenu" TargetType="ContextMenu">
         <Setter Property="Foreground" Value="{DynamicResource Text}"/>
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu">
