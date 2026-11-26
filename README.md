@@ -4,7 +4,7 @@ An MIT-licensed Windows desktop calendar widget built with C#, .NET 10 and WPF. 
 
 ## Features
 
-- Day, three consecutive days, Monday–Friday workweek, Monday–Sunday week, month and twelve-month year views. The year uses two rows of six months, grouped into labeled Q1–Q4 panels with three months each. Narrow widgets scroll horizontally rather than wrapping the months into extra rows.
+- Day, three consecutive days, Monday–Friday workweek, Monday–Sunday week, month and twelve-month year views. The year uses two rows of six months, grouped into labeled Q1–Q4 panels with three months each. Square date cells and proportional scaling keep month grids balanced. The annual grid fits the available area, stays centered and caps its width on wide widgets without changing its two-row structure.
 - Today navigation, previous/next periods and clickable dates. Event details appear on hover. Month cells show a compact event preview; smaller widgets use event dots. Hover a date for the event summary, or open a day to see the full agenda.
 - Multiple Google calendars with individual visibility and calendar colors.
 - Read-only Google Calendar synchronization, recurring event instances, all-day events and events spanning midnight. Timed events and the red current-time marker use the primary Google calendar time zone by default; select another calendar as the time-zone source in settings. When cached metadata has no zone, the Windows local zone is used; all-day dates retain their calendar dates and exclusive end dates.
@@ -38,7 +38,7 @@ The widget has no in-content logo or product name; the application icon remains 
 
 ## Time scale and desktop hosting
 
-Day, three-day, workweek and week views use a shared 24-hour grid. Timed events occupy their calendar-local slots and overlapping events use separate lanes. All-day events remain above the hourly grid. A red line and starting dot appear only in the current calendar-local day and render above events. A dispatcher timer updates the clock at minute boundaries without API calls or rebuilding the view. Opening a day/week view scrolls near the current time; later ticks preserve the chosen scroll position. Month and year views have no hourly scale and do not display the line.
+Day, three-day, workweek and week views use a shared 24-hour grid. Hovering a time slot uses a hand cursor, while the time-label gutter keeps the standard arrow. Timed events occupy their calendar-local slots and overlapping events use separate lanes. All-day events remain above the hourly grid. A red line and starting dot appear only in the current calendar-local day and render above events. A dispatcher timer updates the clock at minute boundaries without API calls or rebuilding the view. Opening a day/week view scrolls near the current time; later ticks preserve the chosen scroll position. Month and year views have no hourly scale and do not display the line.
 
 Desktop integration uses Win32 `SetParent` with the existing `SHELLDLL_DefView` desktop view. This also accommodates the raised desktop composition used by recent Windows 11 versions. It does not use a periodically lowered top-level window or change Explorer styles. Authentication remains a separate presentation state in the existing window; its browser flow, scopes and token handling are unchanged. Explorer must be running for desktop hosting. The shell desktop class is an Explorer implementation detail: validate new Windows shell builds and restart Wideska if Explorer is restarted and destroys the hosted window.
 

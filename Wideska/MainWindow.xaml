@@ -56,15 +56,16 @@
                     <ScrollViewer Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                         <controls:DayTimeline x:Name="Timeline" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
-                    <ScrollViewer Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="YearCalendar" ItemsSource="{Binding Quarters}" MinWidth="648">
+                    <Grid Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}">
+                        <Viewbox Stretch="Uniform" MaxWidth="1440" HorizontalAlignment="Center" VerticalAlignment="Top">
+                        <ItemsControl x:Name="YearCalendar" ItemsSource="{Binding Quarters}" Width="1200">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" Rows="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <Border Margin="4" Padding="8" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="14">
+                                <Border Margin="6" Padding="16" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="14">
                                     <StackPanel>
-                                        <DockPanel Margin="2,0,2,8">
-                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Range}" Style="{StaticResource Caption}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                                            <Border Background="{DynamicResource Panel}" CornerRadius="7" Padding="8,4" HorizontalAlignment="Left"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" FontSize="11"/></Border>
+                                        <DockPanel Margin="2,0,2,12">
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Range}" Style="{StaticResource Caption}" FontSize="18" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                            <Border Background="{DynamicResource Panel}" CornerRadius="9" Padding="10,5" HorizontalAlignment="Left"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" FontSize="18"/></Border>
                                         </DockPanel>
                                         <ItemsControl ItemsSource="{Binding Months}" ItemTemplate="{StaticResource YearMonthTemplate}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -73,7 +74,8 @@
                                 </Border>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
+                    </Viewbox>
+                    </Grid>
                 </Grid>
                 <StackPanel Grid.Row="3" Margin="0,8,0,0" Style="{StaticResource QuietControls}">
                     <ProgressBar Height="2" IsIndeterminate="True" Visibility="{Binding Busy, Converter={StaticResource VisibleIf}}" Margin="0,0,0,6"/>
