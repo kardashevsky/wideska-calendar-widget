@@ -36,6 +36,7 @@ public partial class MainWindow : Window
         this.enableDesktopIntegration = enableDesktopIntegration;
         DataContext = model;
         model.AppearanceChanged += ApplyAppearance;
+        IsVisibleChanged += (_, _) => model.SetClockVisible(IsVisible);
         model.FitDesktopRequested += FitDesktop;
         MouseMove += OnMove;
         MouseLeftButtonUp += (_, _) => { dragPoint = null; Mouse.Capture(null); };
@@ -75,18 +76,18 @@ public partial class MainWindow : Window
         bool dark = model.DarkTheme;
         var colors = new Dictionary<string, string>
         {
-            ["Surface"] = dark ? "#FA1A1D29" : "#FAF5F3FA", ["Panel"] = dark ? "#FF2C3042" : "#FFE7E2F0",
-            ["Text"] = dark ? "#FFF5F3FF" : "#FF252036", ["Muted"] = dark ? "#FFC1BED5" : "#FF605874",
-            ["Line"] = dark ? "#24FFFFFF" : "#24252036", ["Accent"] = dark ? "#FFC4B5FD" : "#FF6B46B0",
-            ["AccentFill"] = dark ? "#FF8B72DB" : "#FF7655BE",
-            ["TimelineCard"] = dark ? "#ED202230" : "#F2FFFFFF",
-            ["TimelineMuted"] = dark ? "#CCD1E0" : "#535D73",
-            ["TimelineAxis"] = dark ? "#80A1A9BF" : "#8064738C",
-            ["TimelineGrid"] = dark ? "#38CDD3E0" : "#3864738C",
+            ["Surface"] = dark ? "#FA141A1F" : "#FAF5F7FA", ["Panel"] = dark ? "#FF253039" : "#FFE7EDF2",
+            ["Text"] = dark ? "#FFF1F5F9" : "#FF17212B", ["Muted"] = dark ? "#FFAFBDC9" : "#FF586B7C",
+            ["Line"] = dark ? "#24FFFFFF" : "#2417212B", ["Accent"] = dark ? "#FF8DD3EF" : "#FF24698C",
+            ["AccentFill"] = dark ? "#FF347E9F" : "#FF24698C",
+            ["TimelineCard"] = dark ? "#ED1D2730" : "#F2FFFFFF",
+            ["TimelineMuted"] = dark ? "#BBCAD5" : "#526574",
+            ["TimelineAxis"] = dark ? "#8098ACBA" : "#80607586",
+            ["TimelineGrid"] = dark ? "#38BBCAD5" : "#38607586",
             ["TimelineNow"] = "#F43F5E"
         };
         foreach (var pair in colors) Application.Current.Resources[pair.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));
-        var tint = (Color)ColorConverter.ConvertFromString(dark ? "#101420" : "#F5F3FA");
+        var tint = (Color)ColorConverter.ConvertFromString(dark ? "#10181E" : "#F5F7FA");
         tint.A = (byte)Math.Round(model.BackgroundOpacity * 255);
         Application.Current.Resources["WidgetGlass"] = new SolidColorBrush(tint);
         // Only the glass brush is translucent; content and controls retain full opacity.

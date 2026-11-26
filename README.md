@@ -32,6 +32,10 @@ dotnet build Wideska/Wideska.slnx -c Release --artifacts-path artifacts/build
 .\artifacts\build\bin\Wideska\release\Wideska.exe
 ```
 
+## Widget heading
+
+The widget has no in-content logo or product name; the application icon remains in the tray and executable. The selected month and year form the large heading (year only in the annual view). Day view adds the selected weekday and date, plus a calendar-local `HH:mm:ss` clock. The clock updates only its text each second while day view is visible; the minute-based timeline and Google synchronization remain separate. The interface uses graphite surfaces and cool blue accents in dark mode, with matching neutral light-mode colors. Google calendar colors are preserved.
+
 ## Time scale and desktop hosting
 
 Day, three-day, workweek and week views use a shared 24-hour grid. Timed events occupy their calendar-local slots and overlapping events use separate lanes. All-day events remain above the hourly grid. A red line and starting dot appear only in the current calendar-local day and render above events. A dispatcher timer updates the clock at minute boundaries without API calls or rebuilding the view. Opening a day/week view scrolls near the current time; later ticks preserve the chosen scroll position. Month and year views have no hourly scale and do not display the line.
