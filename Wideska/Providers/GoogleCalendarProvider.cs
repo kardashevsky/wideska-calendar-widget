@@ -98,7 +98,7 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
         {
             using var doc = await GetAsync("users/me/calendarList?maxResults=250" + (page is null ? "" : "&pageToken=" + Uri.EscapeDataString(page)), token);
             foreach (var item in doc.RootElement.GetProperty("items").EnumerateArray())
-                calendars.Add(new(Text(item, "id"), Text(item, "summary"), Text(item, "backgroundColor", "#7C9AFF")));
+                calendars.Add(new(Text(item, "id"), Text(item, "summary"), Text(item, "backgroundColor", "#7C9AFF"), Text(item, "timeZone"), item.TryGetProperty("primary", out var primary) && primary.GetBoolean()));
             page = Text(doc.RootElement, "nextPageToken", "");
         } while (!string.IsNullOrEmpty(page));
         List<CalendarEvent> events = [];

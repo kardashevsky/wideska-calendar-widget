@@ -89,12 +89,14 @@ internal static partial class Program
             int bindingErrors = 0;
             var listener = new BindingListener(() => bindingErrors++);
             System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add(listener);
+            var activeBeforeStartup = GetForegroundWindow();
             window.Show();
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check(GetForegroundWindow() == activeBeforeStartup, "Initial window presentation must not steal application focus while checking authorization");
             using (var desktop = new DesktopIntegration(window))
             {
                 desktop.Apply(WindowBehavior.AlwaysOnTop);
-                Check(window.Topmost, "Always-on-top behavior");
+                Check(!window.Topmost, "Legacy always-on-top settings must not raise the desktop widget above applications");
                 desktop.Apply(WindowBehavior.Desktop);
                 Check(!window.Topmost && !window.ShowInTaskbar, "Desktop window behavior");
                 desktop.Apply(WindowBehavior.Normal);
@@ -143,6 +145,7 @@ internal static partial class Program
             var saved = await store.ReadAsync<WidgetSettings>("settings.bin", true);
             Check(saved?.View == CalendarView.Month, "Settings must persist");
             await TestOnboardingAsync(app, directory);
+            await TestTimeIndicatorAsync(app, directory);
         }
         finally { Directory.Delete(directory, true); }
     }

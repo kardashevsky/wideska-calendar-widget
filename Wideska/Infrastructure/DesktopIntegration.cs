@@ -13,14 +13,23 @@ public sealed class DesktopIntegration : IDisposable
     private readonly HwndSource source;
     private NotifyIconData icon;
     private const int CallbackMessage = 0x8001;
-    private const int WindowPositionChanging = 0x0046;
     private bool desktop;
-    private bool revealing;
     private bool disposed;
     public event Action? QuitRequested;
     public event Action? SettingsRequested;
     public event Action? SyncRequested;
     public ContextMenu TrayMenu { get; }
+    public DesktopHost Host { get; }
+    public event Action<bool>? GeometryLockChanged;
+    public event Action? FitDesktopRequested;
+    private readonly MenuItem lockItem;
+    private readonly MenuItem fitItem;
+    private bool geometryLocked;
+    public bool GeometryLocked
+    {
+        get => geometryLocked;
+        set { geometryLocked = value; lockItem.IsChecked = value; fitItem.IsEnabled = !value; }
+    }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NotifyIconData
     {
@@ -32,9 +41,7 @@ public sealed class DesktopIntegration : IDisposable
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string Title;
         public uint InfoFlags; public Guid Guid; public IntPtr BalloonIcon;
     }
-    [StructLayout(LayoutKind.Sequential)] private struct WindowPosition { public IntPtr Window; public IntPtr After; public int X; public int Y; public int Width; public int Height; public uint Flags; }
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool Shell_NotifyIcon(uint message, ref NotifyIconData data);
-    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetWindowPos(IntPtr handle, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(IntPtr handle);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern uint RegisterWindowMessage(string message);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr handle, uint flags);
@@ -53,63 +60,62 @@ public sealed class DesktopIntegration : IDisposable
         AddMenuItem("Settings / Google sign-in", () => { Show(); SettingsRequested?.Invoke(); });
         AddMenuItem("Sync calendars", () => SyncRequested?.Invoke());
         AddMenuItem("Move to visible screen", () => { CenterOnScreen(); Show(); });
+        lockItem = AddMenuItem("Lock position and size", () => { GeometryLocked = !GeometryLocked; GeometryLockChanged?.Invoke(GeometryLocked); });
+        lockItem.IsCheckable = true;
+        fitItem = AddMenuItem("Fill desktop work area", () => { if (!GeometryLocked) FitDesktopRequested?.Invoke(); });
         TrayMenu.Items.Add(new Separator());
         AddMenuItem("Exit Wideska", () => QuitRequested?.Invoke());
         var handle = new WindowInteropHelper(window).EnsureHandle();
         source = HwndSource.FromHwnd(handle)!;
         source.AddHook(Hook);
+        Host = new DesktopHost(window);
         icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Wideska — desktop calendar", Info = "", Title = "" };
         if (!Shell_NotifyIcon(0, ref icon))
         {
             ApplicationIcon.DestroyIcon(icon.Icon); source.RemoveHook(Hook);
             throw new InvalidOperationException("Unable to create the system tray icon.");
         }
-        window.Deactivated += OnDeactivated;
     }
-    private void AddMenuItem(string title, Action action)
+    private MenuItem AddMenuItem(string title, Action action)
     {
         var item = new MenuItem { Header = title };
         item.SetResourceReference(FrameworkElement.StyleProperty, "TrayMenuItem");
         item.Click += (_, _) => { TrayMenu.IsOpen = false; action(); };
         TrayMenu.Items.Add(item);
+        return item;
     }
     public void Apply(WindowBehavior behavior)
     {
         desktop = behavior == WindowBehavior.Desktop;
-        window.Topmost = behavior == WindowBehavior.AlwaysOnTop;
+        window.Topmost = false;
         window.ShowInTaskbar = false;
-        SetWindowPos(icon.Window, new IntPtr(desktop && !revealing ? 1 : behavior == WindowBehavior.AlwaysOnTop ? -1 : -2), 0, 0, 0, 0, 0x13);
+        if (desktop) Host.Attach(); else Host.Detach();
     }
     public void Show()
     {
-        revealing = true;
-        window.Show(); window.WindowState = WindowState.Normal;
-        if (MonitorFromWindow(icon.Window, 0) == IntPtr.Zero) CenterOnScreen();
-        SetWindowPos(icon.Window, window.Topmost ? new IntPtr(-1) : IntPtr.Zero, 0, 0, 0, 0, 0x13);
-        window.Activate(); SetForegroundWindow(icon.Window);
+        window.ShowActivated = !Host.IsAttached;
+        window.Show();
+        if (Host.IsAttached) { Host.RecoverToScreen(); Host.RaiseWithinDesktop(); }
+        else { window.WindowState = WindowState.Normal; if (MonitorFromWindow(icon.Window, 0) == IntPtr.Zero) CenterOnScreen(); window.Activate(); SetForegroundWindow(icon.Window); }
     }
     public void CenterOnScreen()
     {
+        if (Host.IsAttached)
+        {
+            if (GeometryLocked) return;
+            var b = Host.GetBounds(); var desktopArea = Host.WorkArea();
+            Host.SetBounds(b with { X = desktopArea.X + Math.Max(0, (desktopArea.Width - b.Width) / 2), Y = desktopArea.Y + Math.Max(0, (desktopArea.Height - b.Height) / 2) });
+            return;
+        }
         window.WindowState = WindowState.Normal;
         var work = SystemParameters.WorkArea;
         window.Left = work.Left + Math.Max(0, (work.Width - window.Width) / 2);
         window.Top = work.Top + Math.Max(0, (work.Height - window.Height) / 2);
     }
-    private void OnDeactivated(object? sender, EventArgs e)
-    {
-        revealing = false;
-        if (desktop && !disposed) SetWindowPos(icon.Window, new IntPtr(1), 0, 0, 0, 0, 0x13);
-    }
     private IntPtr Hook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if ((uint)message == showRequested) { Show(); handled = true; return IntPtr.Zero; }
         if ((uint)message == taskbarCreated) Shell_NotifyIcon(0, ref icon);
-        if (desktop && !revealing && message == WindowPositionChanging)
-        {
-            var position = Marshal.PtrToStructure<WindowPosition>(lParam);
-            position.After = new IntPtr(1); position.Flags &= ~0x4u;
-            Marshal.StructureToPtr(position, lParam, false);
-        }
         if (message != CallbackMessage) return IntPtr.Zero;
         if (lParam.ToInt32() is 0x0202 or 0x0203 or 0x0400 or 0x0401) { Show(); handled = true; }
         if (lParam.ToInt32() is 0x0205 or 0x007B)
@@ -135,7 +141,7 @@ public sealed class DesktopIntegration : IDisposable
     {
         if (disposed) return;
         disposed = true; TrayMenu.IsOpen = false;
-        window.Deactivated -= OnDeactivated;
+        Host.Dispose();
         Shell_NotifyIcon(2, ref icon); source.RemoveHook(Hook);
         ApplicationIcon.DestroyIcon(icon.Icon);
     }
