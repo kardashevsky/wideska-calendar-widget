@@ -53,7 +53,7 @@
                         </ItemsControl>
                     </Grid>
                     <ScrollViewer Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <controls:DayTimeline x:Name="Timeline" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource Line}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
+                        <controls:DayTimeline x:Name="Timeline" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
                     <ScrollViewer Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl ItemsSource="{Binding Months}">
