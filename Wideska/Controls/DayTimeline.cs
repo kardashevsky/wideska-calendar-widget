@@ -20,6 +20,8 @@ public sealed class DayTimeline : Control
     public static readonly DependencyProperty AxisBrushProperty = ThemeBrush(nameof(AxisBrush), "#8098ACBA");
     public static readonly DependencyProperty AccentBrushProperty = ThemeBrush(nameof(AccentBrush), "#8DD3EF");
     public static readonly DependencyProperty NowBrushProperty = ThemeBrush(nameof(NowBrush), "#F43F5E");
+    public static readonly DependencyProperty WeekendBrushProperty = ThemeBrush(nameof(WeekendBrush), "#FDA4AF");
+    public Brush WeekendBrush { get => (Brush)GetValue(WeekendBrushProperty); set => SetValue(WeekendBrushProperty, value); }
     public Brush SurfaceBrush { get => (Brush)GetValue(SurfaceBrushProperty); set => SetValue(SurfaceBrushProperty, value); }
     public Brush MutedBrush { get => (Brush)GetValue(MutedBrushProperty); set => SetValue(MutedBrushProperty, value); }
     public Brush AxisBrush { get => (Brush)GetValue(AxisBrushProperty); set => SetValue(AxisBrushProperty, value); }
@@ -144,9 +146,9 @@ public sealed class DayTimeline : Control
             if (index == today)
             {
                 dc.PushOpacity(.1); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 6, 4, Math.Max(1, column - 12), 34), 10, 10); dc.Pop();
-                Text(dc, day.Label, x + 16, 12, column - 28, 13, AccentBrush, FontWeights.SemiBold);
+                Text(dc, day.Label, x + 16, 12, column - 28, 13, day.IsWeekend ? WeekendBrush : AccentBrush, FontWeights.SemiBold);
             }
-            else Text(dc, day.Label, x + 14, 12, column - 24, 13, Foreground, FontWeights.Medium);
+            else Text(dc, day.Label, x + 14, 12, column - 24, 13, day.IsWeekend ? WeekendBrush : Foreground, FontWeights.Medium);
             dc.DrawLine(gridPen, new Point(x, DayHeaderHeight), new Point(x, ActualHeight - 16));
             int row = 0;
             foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))

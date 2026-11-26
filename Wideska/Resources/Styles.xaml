@@ -12,6 +12,7 @@
     <SolidColorBrush x:Key="TimelineAxis" Color="#8098ACBA"/>
     <SolidColorBrush x:Key="TimelineGrid" Color="#38BBCAD5"/>
     <SolidColorBrush x:Key="TimelineNow" Color="#F43F5E"/>
+    <SolidColorBrush x:Key="Weekend" Color="#FDA4AF"/>
     <BooleanToVisibilityConverter x:Key="VisibleIf"/>
     <converters:CompactHeightConverter x:Key="CompactHeight"/>
     <converters:TimelineWidthConverter x:Key="TimelineWidth"/>
@@ -191,7 +192,7 @@
             <StackPanel>
                 <TextBlock Text="{Binding Title}" FontWeight="Medium" FontSize="12" Margin="0,0,0,6" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                 <UniformGrid Columns="7" Margin="0,0,0,4">
-                    <TextBlock Text="M" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="T" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="W" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="T" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="F" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="S" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="S" FontSize="9" HorizontalAlignment="Center"/>
+                    <TextBlock Text="M" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="T" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="W" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="T" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="F" FontSize="9" HorizontalAlignment="Center"/><TextBlock Text="Sa" FontSize="9" HorizontalAlignment="Center" Foreground="{DynamicResource Weekend}"/><TextBlock Text="Su" FontSize="9" HorizontalAlignment="Center" Foreground="{DynamicResource Weekend}"/>
                 </UniformGrid>
                 <ItemsControl ItemsSource="{Binding Days}">
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>

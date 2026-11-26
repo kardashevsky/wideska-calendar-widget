@@ -84,7 +84,8 @@ public partial class MainWindow : Window
             ["TimelineMuted"] = dark ? "#BBCAD5" : "#526574",
             ["TimelineAxis"] = dark ? "#8098ACBA" : "#80607586",
             ["TimelineGrid"] = dark ? "#38BBCAD5" : "#38607586",
-            ["TimelineNow"] = "#F43F5E"
+            ["TimelineNow"] = "#F43F5E",
+            ["Weekend"] = dark ? "#FDA4AF" : "#BE123C"
         };
         foreach (var pair in colors) Application.Current.Resources[pair.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));
         var tint = (Color)ColorConverter.ConvertFromString(dark ? "#10181E" : "#F5F7FA");
