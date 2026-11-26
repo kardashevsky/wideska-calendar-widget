@@ -424,3 +424,11 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Local OAuth configuration and authentication data
+client_secret*.json
+credentials*.json
+token*.json
+google-token.bin
+calendar-cache.bin
+settings.bin
