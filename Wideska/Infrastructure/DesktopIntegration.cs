@@ -34,7 +34,6 @@ public sealed class DesktopIntegration : IDisposable
     }
     [StructLayout(LayoutKind.Sequential)] private struct WindowPosition { public IntPtr Window; public IntPtr After; public int X; public int Y; public int Width; public int Height; public uint Flags; }
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool Shell_NotifyIcon(uint message, ref NotifyIconData data);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr LoadIcon(IntPtr instance, IntPtr name);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetWindowPos(IntPtr handle, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(IntPtr handle);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern uint RegisterWindowMessage(string message);
@@ -59,8 +58,12 @@ public sealed class DesktopIntegration : IDisposable
         var handle = new WindowInteropHelper(window).EnsureHandle();
         source = HwndSource.FromHwnd(handle)!;
         source.AddHook(Hook);
-        icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = LoadIcon(IntPtr.Zero, new IntPtr(32512)), Tip = "Wideska — desktop calendar", Info = "", Title = "" };
-        if (!Shell_NotifyIcon(0, ref icon)) throw new InvalidOperationException("Unable to create the system tray icon.");
+        icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Wideska — desktop calendar", Info = "", Title = "" };
+        if (!Shell_NotifyIcon(0, ref icon))
+        {
+            ApplicationIcon.DestroyIcon(icon.Icon); source.RemoveHook(Hook);
+            throw new InvalidOperationException("Unable to create the system tray icon.");
+        }
         window.Deactivated += OnDeactivated;
     }
     private void AddMenuItem(string title, Action action)
@@ -134,5 +137,6 @@ public sealed class DesktopIntegration : IDisposable
         disposed = true; TrayMenu.IsOpen = false;
         window.Deactivated -= OnDeactivated;
         Shell_NotifyIcon(2, ref icon); source.RemoveHook(Hook);
+        ApplicationIcon.DestroyIcon(icon.Icon);
     }
 }

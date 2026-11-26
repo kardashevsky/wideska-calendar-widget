@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Resources/Icons/Wideska.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Resource Include="Resources/Icons/Wideska.ico" />
+    <Resource Include="Resources/Icons/Wideska.png" />
+  </ItemGroup>
 </Project>
