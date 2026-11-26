@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Wideska.Infrastructure;
 using Wideska.Models;
 using Wideska.Providers;
@@ -13,7 +14,7 @@ public sealed class CalendarSelection(CalendarInfo calendar, bool visible, Actio
     private bool visible = visible;
     public bool Visible { get => visible; set { if (Set(ref visible, value)) changed(); } }
 }
-public sealed record EventItem(string Title, string Time, string Color, string Details);
+public sealed record EventItem(string Title, string Time, string Color, string Details, bool AllDay = false, double StartMinute = 0, double EndMinute = 0);
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
     public string Label => Date.ToString("ddd, d", CultureInfo.CurrentCulture);
@@ -38,6 +39,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim syncGate = new(1, 1);
     private Task? refreshLoop;
+    private readonly DispatcherTimer minuteTimer = new();
+    private DateTimeOffset currentTime = DateTimeOffset.UtcNow;
+    public DateTimeOffset CurrentTime => currentTime;
+    public string CalendarTimeZoneId => (snapshot.Calendars.FirstOrDefault(c => c.Id == Settings.TimeZoneCalendarId) ?? snapshot.Calendars.FirstOrDefault(c => c.IsPrimary) ?? snapshot.Calendars.FirstOrDefault())?.TimeZoneId ?? "";
+    public string CalendarTimeZoneLabel => CalendarTime.Resolve(CalendarTimeZoneId).DisplayName;
+    public string TimeZoneCalendarId { get => Settings.TimeZoneCalendarId; set { Settings.TimeZoneCalendarId = value; Changed(); UpdateTimeZone(); _ = SaveSafelyAsync(); } }
+    public bool GeometryLocked { get => Settings.GeometryLocked; set { Settings.GeometryLocked = value; Changed(); Changed(nameof(CanEditGeometry)); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
+    public bool CanEditGeometry => ShowWidget && !GeometryLocked;
+    public event Action? FitDesktopRequested;
+    public ICommand FitDesktopCommand { get; }
     private CalendarSnapshot snapshot = new([], [], default);
     private readonly Dictionary<DateTime, List<CalendarEvent>> eventsByDay = [];
     public WidgetSettings Settings { get; private set; } = new();
@@ -47,7 +58,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ViewChoice[] Views { get; } = [new(CalendarView.SingleDay, "Day"), new(CalendarView.ThreeDays, "3 days"), new(CalendarView.Workweek, "Workweek"), new(CalendarView.Week, "Week"), new(CalendarView.Month, "Month"), new(CalendarView.Year, "Year")];
     public BehaviorChoice[] Behaviors { get; } = [new(WindowBehavior.Normal, "Normal window"), new(WindowBehavior.AlwaysOnTop, "Always on top"), new(WindowBehavior.Desktop, "Behind other windows")];
     private DateTime anchor = DateTime.Today;
-    private DateTime observedToday = DateTime.Today;
     private bool followToday = true;
     private string status = "Connect Google Calendar to display your events.";
     public string Status { get => status; private set => Set(ref status, value); }
@@ -72,6 +82,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void NotifyPresentation()
     {
         Changed(nameof(ShowWidget)); Changed(nameof(ShowAuthorization));
+        Changed(nameof(CanEditGeometry));
         AppearanceChanged?.Invoke();
     }
     public string ConnectionLabel => Connected ? "Google Calendar connected" : "No account connected";
@@ -107,9 +118,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(LocalStore store, ICalendarProvider provider)
     {
         this.store = store; this.provider = provider;
+        FitDesktopCommand = new RelayCommand(_ => { if (!GeometryLocked) FitDesktopRequested?.Invoke(); });
+        minuteTimer.Tick += (_, _) => { UpdateCurrentTime(DateTimeOffset.UtcNow); ScheduleMinute(); };
         PreviousCommand = new RelayCommand(_ => Navigate(-1));
         NextCommand = new RelayCommand(_ => Navigate(1));
-        TodayCommand = new RelayCommand(_ => { followToday = true; anchor = DateTime.Today; Rebuild(); _ = RefreshIfNeededAsync(); });
+        TodayCommand = new RelayCommand(_ => { followToday = true; anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date; Rebuild(); _ = RefreshIfNeededAsync(); });
         RefreshCommand = new AsyncCommand(RefreshAsync, ReportError);
         ConnectCommand = new AsyncCommand(ConnectAsync, ReportError);
         DisconnectCommand = new AsyncCommand(async () =>
@@ -178,6 +191,27 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex) { ReportError(ex); }
         finally { IsInitialized = true; }
+        UpdateCurrentTime(DateTimeOffset.UtcNow);
+        ScheduleMinute();
+    }
+    private void ScheduleMinute()
+    {
+        if (lifetime.IsCancellationRequested) return;
+        minuteTimer.Interval = TimeSpan.FromMilliseconds(60000 - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 60000);
+        minuteTimer.Start();
+    }
+    public void UpdateCurrentTime(DateTimeOffset now)
+    {
+        DateTime before = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
+        currentTime = now; Changed(nameof(CurrentTime));
+        DateTime today = CalendarTime.Local(now, CalendarTimeZoneId).Date;
+        if (before != today) { if (followToday) anchor = today; Rebuild(); }
+    }
+    private void UpdateTimeZone()
+    {
+        Changed(nameof(CalendarTimeZoneId)); Changed(nameof(CalendarTimeZoneLabel));
+        if (followToday) anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
+        ReindexEvents(); Rebuild();
     }
     private async Task RefreshLoopAsync()
     {
@@ -186,12 +220,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             while (!lifetime.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromMinutes(SyncMinutes), lifetime.Token);
-                if (observedToday != DateTime.Today)
-                {
-                    observedToday = DateTime.Today;
-                    if (followToday) anchor = observedToday;
-                    Rebuild();
-                }
                 await RefreshAsync();
             }
         }
@@ -207,7 +235,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             // Cache the displayed year and adjacent months for navigation and offline use.
             var start = new DateTime(anchor.Year, 1, 1).AddMonths(-1);
             var end = new DateTime(anchor.Year + 1, 1, 1).AddMonths(1);
-            var next = await provider.GetSnapshotAsync(new DateTimeOffset(start), new DateTimeOffset(end), lifetime.Token);
+            var next = await provider.GetSnapshotAsync(CalendarTime.Midnight(start, CalendarTimeZoneId), CalendarTime.Midnight(end, CalendarTimeZoneId), lifetime.Token);
             snapshot = next;
             ReindexEvents();
             await store.WriteAsync("calendar-cache.bin", snapshot, true, lifetime.Token);
@@ -229,9 +257,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     private void ApplyCalendars()
     {
+        string selected = Settings.TimeZoneCalendarId;
         Calendars.Clear();
         foreach (var calendar in snapshot.Calendars)
             Calendars.Add(new(calendar, !Settings.HiddenCalendars.Contains(calendar.Id), () => { Settings.HiddenCalendars = Calendars.Where(c => !c.Visible).Select(c => c.Calendar.Id).ToList(); Rebuild(); _ = SaveSafelyAsync(); }));
+        Settings.TimeZoneCalendarId = snapshot.Calendars.Any(c => c.Id == selected) ? selected : (snapshot.Calendars.FirstOrDefault(c => c.IsPrimary) ?? snapshot.Calendars.FirstOrDefault())?.Id ?? "";
+        Changed(nameof(TimeZoneCalendarId)); UpdateTimeZone();
     }
     private Task RefreshIfNeededAsync()
     {
@@ -249,19 +280,28 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         var events = (eventsByDay.GetValueOrDefault(day) ?? []).Where(e => !Settings.HiddenCalendars.Contains(e.CalendarId))
             .OrderByDescending(e => e.AllDay).ThenBy(e => e.Start)
-            .Select(e => new EventItem(e.Title, e.AllDay ? "All day" : $"{e.Start.LocalDateTime:t} – {e.End.LocalDateTime:t}", e.Color,
-                $"{e.Title}\n{(e.AllDay ? "All day" : $"{e.Start.LocalDateTime:g} – {e.End.LocalDateTime:g}")}\n{e.Location}\n{e.Description}".Trim())).ToList();
-        return new(day, day.Month == month, day == DateTime.Today, events);
+            .Select(e =>
+            {
+                var start = CalendarTime.Local(e.Start, CalendarTimeZoneId);
+                var end = CalendarTime.Local(e.End, CalendarTimeZoneId);
+                string time = e.AllDay ? "All day" : $"{start:t} – {end:t}";
+                double startMinute = start.Date < day ? 0 : start.TimeOfDay.TotalMinutes;
+                double endMinute = end.Date > day ? 1440 : end.TimeOfDay.TotalMinutes;
+                if (!e.AllDay && endMinute <= startMinute && e.End > e.Start) endMinute = Math.Min(1440, startMinute + (e.End - e.Start).TotalMinutes);
+                return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{e.Description}".Trim(), e.AllDay,
+                    startMinute, endMinute);
+            }).ToList();
+        return new(day, day.Month == month, day == CalendarTime.Local(currentTime, CalendarTimeZoneId).Date, events);
     }
     private void ReindexEvents()
     {
         eventsByDay.Clear();
         foreach (var item in snapshot.Events)
         {
-            DateTime first = item.Start.LocalDateTime.Date;
-            DateTime last = item.End.LocalDateTime;
-            if (snapshot.RangeStart != default && first < snapshot.RangeStart.LocalDateTime.Date) first = snapshot.RangeStart.LocalDateTime.Date;
-            if (snapshot.RangeEnd != default && last > snapshot.RangeEnd.LocalDateTime) last = snapshot.RangeEnd.LocalDateTime;
+            DateTime first = item.AllDay ? item.Start.Date : CalendarTime.Local(item.Start, CalendarTimeZoneId).Date;
+            DateTime last = item.AllDay ? item.End.Date : CalendarTime.Local(item.End, CalendarTimeZoneId);
+            if (snapshot.RangeStart != default && first < CalendarTime.Local(snapshot.RangeStart, CalendarTimeZoneId).Date) first = CalendarTime.Local(snapshot.RangeStart, CalendarTimeZoneId).Date;
+            if (snapshot.RangeEnd != default && last > CalendarTime.Local(snapshot.RangeEnd, CalendarTimeZoneId)) last = CalendarTime.Local(snapshot.RangeEnd, CalendarTimeZoneId);
             for (DateTime day = first; day < last; day = day.AddDays(1))
             {
                 if (!eventsByDay.TryGetValue(day, out var list)) eventsByDay[day] = list = [];
@@ -294,11 +334,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public void ReportError(Exception ex) => Status = ex is OperationCanceledException ? "Authorization timed out or was cancelled." : $"{ex.Message} {(snapshot.Updated != default ? "Showing cached events." : "")}";
     public async Task ShutdownAsync()
     {
+        minuteTimer.Stop();
         lifetime.Cancel();
         if (refreshLoop is not null) await refreshLoop;
         await syncGate.WaitAsync();
         try { await SaveAsync(); }
         finally { syncGate.Release(); }
     }
-    public void Dispose() { lifetime.Cancel(); provider.Dispose(); lifetime.Dispose(); }
+    public void Dispose() { minuteTimer.Stop(); lifetime.Cancel(); provider.Dispose(); lifetime.Dispose(); }
 }

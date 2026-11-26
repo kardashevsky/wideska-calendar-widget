@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private bool quitting;
     private bool? appliedStartup;
     private bool? widgetDisplayed;
+    private Point? dragPoint;
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     public MainWindow() : this(CreateViewModel(), true) { }
     private static MainViewModel CreateViewModel()
@@ -35,6 +36,9 @@ public partial class MainWindow : Window
         this.enableDesktopIntegration = enableDesktopIntegration;
         DataContext = model;
         model.AppearanceChanged += ApplyAppearance;
+        model.FitDesktopRequested += FitDesktop;
+        MouseMove += OnMove;
+        MouseLeftButtonUp += (_, _) => { dragPoint = null; Mouse.Capture(null); };
         LocationChanged += (_, _) => QueueGeometrySave();
         SizeChanged += (_, _) => QueueGeometrySave();
         geometryTimer.Tick += async (_, _) =>
@@ -56,6 +60,9 @@ public partial class MainWindow : Window
             desktop.QuitRequested += Quit;
             desktop.SettingsRequested += () => model.SettingsOpen = model.ShowWidget;
             desktop.SyncRequested += () => model.RefreshCommand.Execute(null);
+            desktop.GeometryLockChanged += value => model.GeometryLocked = value;
+            desktop.FitDesktopRequested += FitDesktop;
+            desktop.Host.GeometryChanged += QueueGeometrySave;
             await model.InitializeAsync();
             if (quitting) return;
             initialized = true;
@@ -79,7 +86,12 @@ public partial class MainWindow : Window
         Application.Current.Resources["WidgetGlass"] = new SolidColorBrush(tint);
         // Only the glass brush is translucent; content and controls retain full opacity.
         Opacity = 1;
-        desktop?.Apply(model.ShowWidget ? model.Behavior : Models.WindowBehavior.Normal);
+        if (desktop is not null)
+        {
+            if (initialized && widgetDisplayed == true && !model.ShowWidget) CaptureGeometry();
+            desktop.GeometryLocked = model.GeometryLocked;
+            desktop.Apply(model.ShowWidget ? Models.WindowBehavior.Desktop : Models.WindowBehavior.Normal);
+        }
         if (initialized && widgetDisplayed != model.ShowWidget)
         {
             geometryTimer.Stop();
@@ -98,6 +110,12 @@ public partial class MainWindow : Window
         if (model.ShowWidget)
         {
             var settings = model.Settings;
+            if (desktop?.Host.IsAttached == true)
+            {
+                double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+                var placement = settings.DesktopPlacement ?? new Models.ScreenPlacement((int)Math.Round(settings.Left * scale), (int)Math.Round(settings.Top * scale), (int)Math.Round(settings.Width * scale), (int)Math.Round(settings.Height * scale));
+                desktop.Host.SetBounds(placement); desktop.Host.RecoverToScreen(); return;
+            }
             Width = double.IsFinite(settings.Width) ? Math.Clamp(settings.Width, MinWidth, Math.Max(MinWidth, SystemParameters.VirtualScreenWidth)) : 720;
             Height = double.IsFinite(settings.Height) ? Math.Clamp(settings.Height, MinHeight, Math.Max(MinHeight, SystemParameters.VirtualScreenHeight)) : 560;
             Left = double.IsFinite(settings.Left) ? Math.Clamp(settings.Left, SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 100) : 100;
@@ -126,18 +144,44 @@ public partial class MainWindow : Window
     }
     private void OnResize(object sender, DragDeltaEventArgs e)
     {
-        Width = Math.Clamp(ActualWidth + e.HorizontalChange, MinWidth, Math.Max(MinWidth, SystemParameters.VirtualScreenWidth));
-        Height = Math.Clamp(ActualHeight + e.VerticalChange, MinHeight, Math.Max(MinHeight, SystemParameters.VirtualScreenHeight));
+        if (model.GeometryLocked) return;
+        string edge = (sender as FrameworkElement)?.Tag as string ?? "SE";
+        if (desktop?.Host.IsAttached == true) { desktop.Host.Resize(edge, e.HorizontalChange, e.VerticalChange); return; }
+        double width = Math.Max(MinWidth, ActualWidth + (edge.Contains('W') ? -e.HorizontalChange : edge.Contains('E') ? e.HorizontalChange : 0));
+        double height = Math.Max(MinHeight, ActualHeight + (edge.Contains('N') ? -e.VerticalChange : edge.Contains('S') ? e.VerticalChange : 0));
+        if (edge.Contains('W')) Left += ActualWidth - width;
+        if (edge.Contains('N')) Top += ActualHeight - height;
+        Width = width; Height = height;
+    }
+    private void FitDesktop()
+    {
+        if (!model.CanEditGeometry) return;
+        if (desktop?.Host.IsAttached == true) desktop.Host.FitToDesktop();
+        else { var area = SystemParameters.WorkArea; Left = area.Left; Top = area.Top; Width = area.Width; Height = area.Height; }
     }
     private void OnDrag(object sender, MouseButtonEventArgs e)
     {
+        if (model.ShowWidget && model.GeometryLocked) return;
         DependencyObject? source = e.OriginalSource as DependencyObject;
         while (source is not null && !ReferenceEquals(source, sender))
         {
             if (source is ButtonBase or System.Windows.Controls.ComboBox or System.Windows.Controls.TextBox) return;
             source = source is Visual ? VisualTreeHelper.GetParent(source) : LogicalTreeHelper.GetParent(source);
         }
-        if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+        if (desktop?.Host.IsAttached == true)
+        {
+            dragPoint = PointToScreen(e.GetPosition(this)); Mouse.Capture(this); e.Handled = true;
+        }
+        else DragMove();
+    }
+    private void OnMove(object sender, MouseEventArgs e)
+    {
+        if (dragPoint is not { } previous || e.LeftButton != MouseButtonState.Pressed || model.GeometryLocked || desktop?.Host.IsAttached != true) return;
+        var current = PointToScreen(e.GetPosition(this));
+        var b = desktop.Host.GetBounds();
+        desktop.Host.SetBounds(b with { X = b.X + (int)Math.Round(current.X - previous.X), Y = b.Y + (int)Math.Round(current.Y - previous.Y) });
+        dragPoint = current;
     }
     private void OnHide(object sender, RoutedEventArgs e) { if (desktop is not null) Hide(); }
     private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized && desktop is not null) Hide(); }
@@ -156,6 +200,7 @@ public partial class MainWindow : Window
     {
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, ActualWidth, ActualHeight) : RestoreBounds;
         if (bounds.IsEmpty || widgetDisplayed != true) return;
+        if (desktop?.Host.IsAttached == true) { model.Settings.DesktopPlacement = desktop.Host.GetBounds(); return; }
         model.Settings.Left = bounds.Left; model.Settings.Top = bounds.Top; model.Settings.Width = bounds.Width; model.Settings.Height = bounds.Height;
     }
     private async void Quit()
