@@ -168,6 +168,14 @@ public sealed class DayTimeline : Control
         { MaxTextWidth = Math.Max(1, width), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis, TextAlignment = alignment };
         dc.DrawText(formatted, new Point(x, y));
     }
+    private void Title(DrawingContext dc, string text, Rect bounds, double size, Brush brush, FontWeight weight)
+    {
+        if (bounds.Width < 2 || bounds.Height < 2) return;
+        dc.PushClip(new RectangleGeometry(bounds));
+        dc.DrawText(EventTitle.Fit(text, new Typeface(FontFamily, FontStyles.Normal, weight, FontStretches.Normal), brush,
+            bounds.Width, bounds.Height, size, VisualTreeHelper.GetDpi(this).PixelsPerDip), bounds.TopLeft);
+        dc.Pop();
+    }
     protected override void OnRender(DrawingContext dc)
     {
         base.OnRender(dc); hits.Clear(); headerHits.Clear(); badgeY = double.NaN;
@@ -289,7 +297,7 @@ public sealed class DayTimeline : Control
         if (!timed)
         {
             dc.DrawEllipse(textBrush, null, new Point(rect.X + 11, rect.Y + rect.Height / 2), 3, 3);
-            Text(dc, item.Title, rect.X + 21, rect.Y + 4, rect.Width - 29, 11, textBrush, FontWeights.Medium);
+            Title(dc, item.Title, new Rect(rect.X + 21, rect.Y + 3, Math.Max(0, rect.Width - 29), Math.Max(0, rect.Height - 6)), 11, textBrush, FontWeights.Medium);
         }
         else
         {
@@ -301,13 +309,13 @@ public sealed class DayTimeline : Control
             {
                 string time = string.IsNullOrEmpty(item.Time) ? start : item.Time;
                 Text(dc, time, rect.X + 14, rect.Y + 8, rect.Width - 24, 10, textBrush, FontWeights.Medium);
-                Text(dc, item.Title, rect.X + 14, rect.Y + 25, rect.Width - 24, 13, textBrush, FontWeights.SemiBold);
+                Title(dc, item.Title, new Rect(rect.X + 14, rect.Y + 24, Math.Max(0, rect.Width - 24), Math.Max(0, rect.Height - 30)), 13, textBrush, FontWeights.Medium);
             }
             else if (rect.Height >= 20)
             {
                 double badgeWidth = Math.Min(39, rect.Width * .4);
                 Text(dc, start, rect.X + 12, rect.Y + 5, badgeWidth, 10, textBrush, FontWeights.Medium);
-                Text(dc, item.Title, rect.X + badgeWidth + 17, rect.Y + 4, rect.Width - badgeWidth - 24, 11, textBrush, FontWeights.Medium);
+                Title(dc, item.Title, new Rect(rect.X + badgeWidth + 17, rect.Y + 3, Math.Max(0, rect.Width - badgeWidth - 24), Math.Max(0, rect.Height - 6)), 11, textBrush, FontWeights.Medium);
             }
         }
         dc.Pop(); (drawingHeader ? headerHits : hits).Add((rect, item.Details, item));
