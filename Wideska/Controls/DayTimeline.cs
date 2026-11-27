@@ -45,6 +45,7 @@ public sealed class DayTimeline : Control
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> hits = [];
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> headerHits = [];
     private ScrollViewer? scrollOwner;
+    private double? pendingWheelOffset;
     private double headerHeight;
     private bool drawingHeader;
     private INotifyCollectionChanged? observed;
@@ -92,6 +93,17 @@ public sealed class DayTimeline : Control
         AddVisualChild(timeBadge);
         AddVisualChild(stickyHeader);
         MinHeight = MinimumTimelineHeight;
+        PreviewMouseWheel += (_, e) =>
+        {
+            if (scrollOwner is null || e.Delta == 0 || headerHeight <= 0) return;
+            double halfHourHeight = (ActualHeight - headerHeight - TimelineBottomPadding) / 48;
+            if (halfHourHeight <= 0) return;
+            double offset = pendingWheelOffset ?? scrollOwner.VerticalOffset;
+            pendingWheelOffset = Math.Clamp(offset - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * halfHourHeight,
+                0, scrollOwner.ScrollableHeight);
+            scrollOwner.ScrollToVerticalOffset(pendingWheelOffset.Value);
+            e.Handled = true;
+        };
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         Loaded += (_, _) => { Observe(); ConnectScrollOwner(); ScheduleScroll(); };
         IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
@@ -132,6 +144,7 @@ public sealed class DayTimeline : Control
     public EventItem? EventAt(Point position) => ItemAt(position).Event;
     private void ConnectScrollOwner()
     {
+        pendingWheelOffset = null;
         if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged;
         DependencyObject? parent = VisualTreeHelper.GetParent(this);
         while (parent is not null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
@@ -141,6 +154,7 @@ public sealed class DayTimeline : Control
     }
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
+        pendingWheelOffset = null;
         if (e.VerticalChange == 0 && e.HorizontalChange == 0 && e.ViewportHeightChange == 0 && e.ViewportWidthChange == 0) return;
         ClearHover(); UpdateHeaderPosition();
         if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;

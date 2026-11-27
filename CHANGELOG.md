@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scroll the day timeline by half an hour per wheel detent, immediately and without delayed snapping.
 - Use zero-padded 24-hour event times in both interface languages.
 - Remove delayed half-hour snapping that caused a second movement after wheel scrolling.
 
