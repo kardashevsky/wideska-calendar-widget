@@ -110,7 +110,7 @@ public sealed class DayTimeline : Control
     }
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (e.VerticalChange == 0 && e.HorizontalChange == 0) return;
+        if (e.VerticalChange == 0 && e.HorizontalChange == 0 && e.ViewportHeightChange == 0 && e.ViewportWidthChange == 0) return;
         ClearHover(); UpdateHeaderPosition();
         if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
     }
@@ -118,6 +118,13 @@ public sealed class DayTimeline : Control
     {
         double offset = scrollOwner?.VerticalOffset ?? 0;
         stickyHeader.Transform = new TranslateTransform(0, offset);
+        // Custom visuals must stay inside the visible scroll viewport, including above the pinned header.
+        double left = scrollOwner?.HorizontalOffset ?? 0;
+        double width = scrollOwner?.ViewportWidth ?? ActualWidth;
+        double height = scrollOwner?.ViewportHeight ?? ActualHeight;
+        var viewport = new Rect(left, offset, Math.Max(0, width), Math.Max(0, height));
+        if (Clip is not RectangleGeometry currentClip || currentClip.Rect != viewport)
+            Clip = new RectangleGeometry(viewport);
         timeBadge.Clip = new RectangleGeometry(new Rect(0, offset + headerHeight, ActualWidth, Math.Max(0, ActualHeight - offset - headerHeight)));
     }
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((DayTimeline)d).Observe();
@@ -245,7 +252,7 @@ public sealed class DayTimeline : Control
                 headerHits.Add((new Rect(x, 0, column, headerHeight), day.Summary, null));
                 if (index == today)
                 {
-                    dc.PushOpacity(.065); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 8, 3, Math.Max(1, column - 16), 28), 6, 6); dc.Pop();
+                    dc.DrawEllipse(AccentBrush, null, new Point(x + 7, 16), 2, 2);
                     dc.DrawLine(new Pen(AccentBrush, 1), new Point(x + 8, headerHeight - 1), new Point(x + column - 8, headerHeight - 1));
                 }
                 Brush label = day.IsWeekend ? WeekendBrush : index == today ? AccentBrush : Foreground;
@@ -273,13 +280,13 @@ public sealed class DayTimeline : Control
         try { color = new SolidColorBrush((Color)ColorConverter.ConvertFromString(item.Color)); }
         catch (FormatException) { color = AccentBrush; }
         bool highlighted = item.Details == hover;
-        double radius = Math.Min(12, rect.Height / 2);
+        double radius = timed ? Math.Min(8, rect.Height / 2) : 5;
         var shape = new RectangleGeometry(rect, radius, radius);
         dc.PushClip(shape);
         dc.DrawRoundedRectangle(SurfaceBrush, null, rect, radius, radius);
         dc.PushOpacity(highlighted ? .2 : .12);
         dc.DrawRoundedRectangle(color, null, rect, radius, radius); dc.Pop();
-        dc.PushOpacity(highlighted ? .9 : .5);
+        dc.PushOpacity(highlighted ? .75 : .3);
         dc.DrawRoundedRectangle(null, new Pen(color, highlighted ? 1.5 : 1), rect, radius, radius); dc.Pop();
         if (!timed)
         {

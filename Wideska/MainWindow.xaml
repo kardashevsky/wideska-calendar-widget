@@ -35,7 +35,7 @@
                         <ComboBox HorizontalAlignment="Left" ItemsSource="{Binding Views}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding View}" ToolTip="Calendar view" AutomationProperties.Name="Calendar view" FontSize="11"/>
                     </DockPanel>
                 </Grid>
-                <Grid x:Name="CalendarContent" Grid.Row="2">
+                <Grid x:Name="CalendarContent" Grid.Row="2" ClipToBounds="True">
                     <Grid Visibility="{Binding IsMonth, Converter={StaticResource VisibleIf}}">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <UniformGrid Columns="7" Margin="0,0,0,6" TextElement.FontSize="10">
@@ -51,7 +51,7 @@
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                         </ItemsControl>
                     </Grid>
-                    <ScrollViewer Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <ScrollViewer ClipToBounds="True" Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                         <controls:DayTimeline x:Name="Timeline" ClockText="{Binding ClockText}" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
                     <Grid Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}">
