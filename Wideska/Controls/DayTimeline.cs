@@ -121,7 +121,9 @@ public sealed class DayTimeline : Control
             scrollTargetOffset = Math.Clamp(offset - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * WheelDistance,
                 0, scrollOwner.ScrollableHeight);
             if (!IsScrollAnimating || wheelDirection != direction) scrollMotion.Reset(scrollOwner.VerticalOffset);
-            expectedScrollOffset = scrollOwner.VerticalOffset;
+            // ScrollToVerticalOffset is queued by WPF. New wheel input must retain the
+            // submitted frame offset until ScrollChanged acknowledges that frame.
+            if (!IsScrollAnimating) expectedScrollOffset = scrollOwner.VerticalOffset;
             scrollMotion.Retarget(scrollTargetOffset);
             wheelDirection = direction;
             if (!SystemParameters.ClientAreaAnimation)

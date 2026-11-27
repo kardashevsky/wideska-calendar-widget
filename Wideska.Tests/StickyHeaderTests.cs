@@ -37,6 +37,7 @@ internal static partial class Program
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, 900)) is null, "Empty hourly slots must not be treated as event hit targets");
         double eventY = headerHeight + 655d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, eventY))?.Title == "Planning session", "Timed event hit targets must remain aligned after scrolling");
+        await TestWheelBurstsAsync(app, timeline, viewer);
         var frameClock = System.Diagnostics.Stopwatch.StartNew();
         var frameTimes = new List<double>();
         var scrollTimes = new List<double>();
