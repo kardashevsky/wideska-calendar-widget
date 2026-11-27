@@ -28,10 +28,15 @@ public sealed class EventColorConverter : IValueConverter
         return luminance > .179 ? Brushes.Black : Brushes.White;
     }
 
+    public static Color CardColor(Wideska.ViewModels.EventItem item) => item.IsSleepCalendar ? Color.FromArgb(140, 18, 25, 33) : VibrantColor(item.Color);
+    public static Brush CardTextBrush(Wideska.ViewModels.EventItem item) => item.IsSleepCalendar ? SleepText : TextBrush(CardColor(item));
+    private static readonly Brush SleepText = new SolidColorBrush(Color.FromRgb(190, 201, 211));
+
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var color = VibrantColor(value as string);
-        if (parameter as string == "Text") return TextBrush(color);
+        var item = value as Wideska.ViewModels.EventItem;
+        var color = item is null ? VibrantColor(value as string) : CardColor(item);
+        if (parameter as string == "Text") return item is null ? TextBrush(color) : CardTextBrush(item);
         var brush = new SolidColorBrush(color);
         brush.Freeze();
         return brush;
