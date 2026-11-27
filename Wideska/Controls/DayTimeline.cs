@@ -49,6 +49,7 @@ public sealed class DayTimeline : Control
     private string? hover;
     private readonly ToolTip eventToolTip = new();
     private bool scrollPending;
+    private string? positionedDateRange;
     private readonly DrawingVisual timeBadge = new();
     private readonly DrawingVisual stickyHeader = new();
     private double badgeY = double.NaN;
@@ -144,7 +145,11 @@ public sealed class DayTimeline : Control
         {
             scrollPending = false;
             var days = Days?.ToList() ?? [];
-            if (!IsVisible || !days.Any(d => CalendarTime.IndicatorMinutes(d.Date, CurrentTime, TimeZoneId) is not null)) return;
+            if (!IsVisible || days.Count == 0) return;
+            string dateRange = string.Join("|", days.Select(d => d.Date.Ticks));
+            if (dateRange == positionedDateRange) return;
+            positionedDateRange = dateRange;
+            if (!days.Any(d => CalendarTime.IndicatorMinutes(d.Date, CurrentTime, TimeZoneId) is not null)) return;
             DependencyObject? parent = VisualTreeHelper.GetParent(this);
             while (parent is not null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
             if (parent is not ScrollViewer viewer) return;
@@ -264,7 +269,9 @@ public sealed class DayTimeline : Control
                     dc.DrawLine(new Pen(AccentBrush, 1), new Point(x + 8, headerHeight - 1), new Point(x + column - 8, headerHeight - 1));
                 }
                 Brush label = day.IsWeekend ? WeekendBrush : index == today ? AccentBrush : Foreground;
-                Text(dc, day.Label, x + 14, 8, column - 24, 12, label, FontWeights.Medium);
+                var fullLabel = new FormattedText(day.FullLabel, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                    new Typeface(FontFamily, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal), 12, label, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                Text(dc, fullLabel.WidthIncludingTrailingWhitespace <= column - 24 ? day.FullLabel : day.Label, x + 14, 8, column - 24, 12, label, FontWeights.Medium);
                 int row = 0;
                 foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))
                     Event(dc, item, new Rect(x + 8, DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - 16), 22), false);

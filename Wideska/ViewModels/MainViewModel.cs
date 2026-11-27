@@ -24,7 +24,8 @@ public sealed record EventItem(string Title, string Time, string Color, string D
 }
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
-    public string Label => Date.ToString("ddd, d", CultureInfo.CurrentCulture);
+    public string Label => $"{Date.ToString("ddd", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture)}, {Date.Day}";
+    public string FullLabel => $"{Date.ToString("ddd", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture)}, {CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Date.ToString("d MMMM", CultureInfo.CurrentCulture))}";
     public bool IsWeekend => Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     public string Number => Date.Day.ToString(CultureInfo.InvariantCulture);
     public IEnumerable<EventItem> PreviewEvents => Events.Take(1);
