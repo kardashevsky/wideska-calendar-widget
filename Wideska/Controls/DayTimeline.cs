@@ -172,7 +172,7 @@ public sealed class DayTimeline : Control
     {
         if (bounds.Width < 2 || bounds.Height < 2) return;
         dc.PushClip(new RectangleGeometry(bounds));
-        dc.DrawText(EventTitle.Fit(text, new Typeface(FontFamily, FontStyles.Normal, weight, FontStretches.Normal), brush,
+        dc.DrawText(EventTitle.Layout(text, new Typeface(FontFamily, FontStyles.Normal, weight, FontStretches.Normal), brush,
             bounds.Width, bounds.Height, size, VisualTreeHelper.GetDpi(this).PixelsPerDip), bounds.TopLeft);
         dc.Pop();
     }
@@ -297,7 +297,7 @@ public sealed class DayTimeline : Control
         if (!timed)
         {
             dc.DrawEllipse(textBrush, null, new Point(rect.X + 11, rect.Y + rect.Height / 2), 3, 3);
-            Title(dc, item.Title, new Rect(rect.X + 21, rect.Y + 3, Math.Max(0, rect.Width - 29), Math.Max(0, rect.Height - 6)), 11, textBrush, FontWeights.Medium);
+            Title(dc, item.Title, new Rect(rect.X + 21, rect.Y + 3, Math.Max(0, rect.Width - 29), Math.Max(0, rect.Height - 6)), 13, textBrush, FontWeights.Medium);
         }
         else
         {
@@ -307,7 +307,7 @@ public sealed class DayTimeline : Control
             {
                 double top = rect.Height >= 46 ? 7 : 3;
                 double titleHeight = Math.Max(12, rect.Height - top - 24);
-                var title = EventTitle.Fit(item.Title, new Typeface(FontFamily, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal),
+                var title = EventTitle.Layout(item.Title, new Typeface(FontFamily, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal),
                     textBrush, width, titleHeight, 13, VisualTreeHelper.GetDpi(this).PixelsPerDip);
                 Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + top, width, titleHeight), 13, textBrush, FontWeights.Medium);
                 double timeY = rect.Y + top + Math.Min(title.Height, titleHeight) + 3;
@@ -316,7 +316,7 @@ public sealed class DayTimeline : Control
             }
             else if (rect.Height >= 20)
             {
-                Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + 3, width, Math.Max(0, rect.Height - 6)), 11, textBrush, FontWeights.Medium);
+                Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + 3, width, Math.Max(0, rect.Height - 6)), 13, textBrush, FontWeights.Medium);
             }
         }
         dc.Pop(); (drawingHeader ? headerHits : hits).Add((rect, item.Details, item));
