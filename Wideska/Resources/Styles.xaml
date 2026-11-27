@@ -183,7 +183,7 @@
         <Grid Margin="1,2" ToolTip="{Binding Details}" TextElement.Foreground="{Binding Converter={StaticResource EventColor}, ConverterParameter=Text}">
             <Border Background="{Binding Converter={StaticResource EventColor}}" CornerRadius="4"/>
             <Border Padding="5,3">
-                <controls:EventTitle Text="{Binding Title}" FontSize="11" MaxHeight="40" HorizontalAlignment="Stretch"/>
+                <controls:EventTitle Text="{Binding Title}" FontSize="13" FontWeight="Medium" MaxHeight="40" HorizontalAlignment="Stretch"/>
             </Border>
         </Grid>
         </Button>

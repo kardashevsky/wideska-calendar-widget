@@ -10,28 +10,21 @@ public sealed class EventTitle : Control
     public static readonly DependencyProperty TextProperty = DependencyProperty.Register(nameof(Text), typeof(string), typeof(EventTitle), new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
     public string Text { get => (string)GetValue(TextProperty); set => SetValue(TextProperty, value); }
 
-    internal static FormattedText Fit(string text, Typeface typeface, Brush brush, double width, double height, double preferredSize, double pixelsPerDip)
+    internal static FormattedText Layout(string text, Typeface typeface, Brush brush, double width, double height, double fontSize, double pixelsPerDip)
     {
-        double minimumSize = Math.Min(preferredSize, 10);
-        FormattedText Create(double size) => new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, size, brush, pixelsPerDip)
-        { MaxTextWidth = Math.Max(1, width), Trimming = TextTrimming.None };
-        double selectedSize = preferredSize;
-        var formatted = Create(selectedSize);
-        for (double size = preferredSize - .5; formatted.Height > height && size >= minimumSize; size -= .5)
+        return new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, brush, pixelsPerDip)
         {
-            selectedSize = size;
-            formatted = Create(size);
-        }
-        formatted.MaxTextHeight = Math.Max(typeface.FontFamily.LineSpacing * selectedSize, height);
-        formatted.Trimming = TextTrimming.CharacterEllipsis;
-        return formatted;
+            MaxTextWidth = Math.Max(1, width),
+            MaxTextHeight = Math.Max(typeface.FontFamily.LineSpacing * fontSize, height),
+            Trimming = TextTrimming.CharacterEllipsis
+        };
     }
 
     protected override Size MeasureOverride(Size availableSize)
     {
         double width = double.IsFinite(availableSize.Width) ? availableSize.Width : 300;
         double height = Math.Min(MaxHeight, double.IsFinite(availableSize.Height) ? availableSize.Height : 64);
-        var text = Fit(Text, new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), Foreground, width, height, FontSize, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var text = Layout(Text, new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), Foreground, width, height, FontSize, VisualTreeHelper.GetDpi(this).PixelsPerDip);
         return new Size(Math.Min(width, text.Width), Math.Min(height, text.Height));
     }
 
@@ -39,7 +32,7 @@ public sealed class EventTitle : Control
     {
         if (ActualWidth < 1 || ActualHeight < 1) return;
         dc.PushClip(new RectangleGeometry(new Rect(RenderSize)));
-        dc.DrawText(Fit(Text, new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), Foreground, ActualWidth, ActualHeight, FontSize, VisualTreeHelper.GetDpi(this).PixelsPerDip), new Point());
+        dc.DrawText(Layout(Text, new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), Foreground, ActualWidth, ActualHeight, FontSize, VisualTreeHelper.GetDpi(this).PixelsPerDip), new Point());
         dc.Pop();
     }
 }
