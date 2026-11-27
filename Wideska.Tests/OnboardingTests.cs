@@ -72,16 +72,14 @@ internal static partial class Program
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(vm.ShowWidget && !vm.ShowAuthorization && vm.Calendars.Count == 2, "Successful consent must reveal and synchronize the widget");
         var calendarContent = (FrameworkElement)window.FindName("CalendarContent");
-        var syncStatus = (FrameworkElement)window.FindName("SyncStatus");
+        Check(window.FindName("SyncStatus") is null, "Calendar must not display synchronization status or progress overlays");
         double contentHeight = calendarContent.ActualHeight;
         provider.DelayMilliseconds = 250;
         Task pendingSync = vm.RefreshAsync();
-        syncStatus.SetCurrentValue(UIElement.VisibilityProperty, Visibility.Visible);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        Check(vm.Busy && contentHeight > 0 && calendarContent.ActualHeight == contentHeight && syncStatus.ActualHeight == 16, "Synchronization must replace the status in place without shifting calendar layout");
+        Check(vm.Busy && contentHeight > 0 && calendarContent.ActualHeight == contentHeight, "Background synchronization must not shift calendar layout");
         await pendingSync;
         provider.DelayMilliseconds = 0;
-        syncStatus.ClearValue(UIElement.VisibilityProperty);
         vm.View = CalendarView.SingleDay; vm.TodayCommand.Execute(null);
         var selected = vm.Days[0].Events.First(e => e.HasDescription);
         vm.OpenEventCommand.Execute(selected);
@@ -134,6 +132,29 @@ internal static partial class Program
         vm.View = CalendarView.ThreeDays;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         SavePreview(window, "three-days-today", true);
+        if (SystemParameters.ClientAreaAnimation)
+        {
+            var next = (System.Windows.Controls.Button)window.FindName("NextPeriodButton");
+            var previous = (System.Windows.Controls.Button)window.FindName("PreviousPeriodButton");
+            var outgoing = (System.Windows.Controls.Image)window.FindName("OutgoingCalendar");
+            double transitionHeight = calendarContent.ActualHeight;
+            next.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, next));
+            var captured = (System.Windows.Media.Imaging.BitmapSource)outgoing.Source;
+            var snapshotEncoder = new PngBitmapEncoder(); snapshotEncoder.Frames.Add(BitmapFrame.Create(captured));
+            using (var snapshotFile = File.Create("artifacts/outgoing-snapshot.png")) snapshotEncoder.Save(snapshotFile);
+            var headerPixel = new byte[4];
+            captured.CopyPixels(new Int32Rect((int)(captured.PixelWidth * .5), (int)(8 * captured.DpiY / 96), 1, 1), headerPixel, 4, 0);
+            Check(headerPixel[3] > 200, "Outgoing snapshot must start with the pinned date header at its local top, without the widget header offset");
+            vm.NextCommand.Execute(null);
+            Check(outgoing.Source is not null && outgoing.Visibility == Visibility.Visible, "Navigation must retain the outgoing calendar only during the transition");
+            await Task.Delay(40);
+            Check(Math.Abs(calendarContent.ActualHeight - transitionHeight) < .5, "Carousel snapshot must not change calendar layout height during navigation");
+            previous.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, previous));
+            vm.PreviousCommand.Execute(null);
+            await Task.Delay(500);
+            Check(outgoing.Source is null && outgoing.Visibility == Visibility.Collapsed && Math.Abs(((TranslateTransform)calendarContent.RenderTransform).X) < .01 && Math.Abs(calendarContent.Opacity - 1) < .01,
+                "Rapid navigation must finish with a fully visible calendar and release transition snapshots");
+        }
         vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -142,6 +163,7 @@ internal static partial class Program
         vm.View = CalendarView.Year;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         SavePreview(window, "year-wallpaper", true);
+        await TestLocalizationAsync(app, window, directory);
         vm.View = CalendarView.Month;
         vm.DarkTheme = false;
         vm.SettingsOpen = true;

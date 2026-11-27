@@ -1,5 +1,9 @@
 ﻿namespace Wideska.ViewModels;
-public sealed record TimedPlacement(EventItem Event, int Lane, int LaneCount);
+public sealed record TimedPlacement(EventItem Event, int Lane, int LaneCount)
+{
+    public double HorizontalOffset => LaneCount <= 1 ? 0 : (double)Lane / (LaneCount + 1);
+    public double WidthFraction => LaneCount <= 1 ? 1 : 2d / (LaneCount + 1);
+}
 public static class TimelineLayout
 {
     public static IReadOnlyList<TimedPlacement> Arrange(IEnumerable<EventItem> events)

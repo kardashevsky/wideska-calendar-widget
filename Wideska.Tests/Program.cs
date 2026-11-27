@@ -62,7 +62,7 @@ internal static partial class Program
             Check(vm.Calendars.Count == 2, "Multiple calendars");
             fake.FailRequests = true;
             await vm.RefreshAsync();
-            Check(vm.Status.Contains("cached") && vm.Calendars.Count == 2, "Offline errors must preserve cached events");
+            Check(vm.Status.Contains(AppLocalization.Text("Showing cached events.")) && vm.Calendars.Count == 2, "Offline errors must preserve cached events");
             fake.FailRequests = false;
             int requestsAfterOfflineCheck = fake.Requests;
             vm.View = CalendarView.Month;
@@ -71,7 +71,7 @@ internal static partial class Program
             vm.View = CalendarView.SingleDay;
             Check(vm.Days.Count == 1 && vm.Days[0].Date == DateTime.Today, "Single day view");
             Check(vm.Days[0].Events.Count == 3, "Timed, all-day and overnight events must overlap today");
-            Check(vm.Days[0].Events[0].Time == "All day", "All-day events sort first");
+            Check(vm.Days[0].Events[0].Time == AppLocalization.Text("All day"), "All-day events sort first");
             vm.Calendars[0].Visible = false;
             Check(vm.Days[0].Events.Count == 1, "Calendar visibility must filter events");
             vm.Calendars[0].Visible = true;
@@ -88,7 +88,7 @@ internal static partial class Program
             vm.View = CalendarView.Year;
             Check(vm.Months.Count == 12 && vm.Months.All(m => m.Days.Count == 42), "Year must contain twelve complete month grids");
             Check(vm.Quarters.Count == 4 && vm.Quarters.All(q => q.Months.Count == 3) && vm.Quarters.SelectMany(q => q.Months).SequenceEqual(vm.Months), "Year must group chronological months into four quarters for a two-by-six layout");
-            Check(vm.Quarters.Select(q => q.Label).SequenceEqual(new[] { "Q1", "Q2", "Q3", "Q4" }), "Quarter labels must identify each group");
+            Check(vm.Quarters.Select(q => q.Label).SequenceEqual(Enumerable.Range(1, 4).Select(q => string.Format(AppLocalization.Text("Quarter"), q))), "Quarter labels must identify each group");
             vm.SelectDayCommand.Execute(new DateTime(2028, 2, 29));
             Check(vm.View == CalendarView.SingleDay && vm.Days[0].Date.Day == 29, "Leap-day navigation");
             vm.TodayCommand.Execute(null);
@@ -102,7 +102,8 @@ internal static partial class Program
             var activeBeforeStartup = GetForegroundWindow();
             window.Show();
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            Check(GetForegroundWindow() == activeBeforeStartup, "Initial window presentation must not steal application focus while checking authorization");
+            var startupHandle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            Check(GetForegroundWindow() != startupHandle || activeBeforeStartup == startupHandle, "Initial window presentation must not steal application focus while checking authorization");
             using (var desktop = new DesktopIntegration(window))
             {
                 desktop.Apply(WindowBehavior.AlwaysOnTop);
@@ -156,6 +157,7 @@ internal static partial class Program
             Check(saved?.View == CalendarView.Month, "Settings must persist");
             await TestOnboardingAsync(app, directory);
             await TestTimeIndicatorAsync(app, directory);
+            await TestAuditRegressionsAsync(app, directory);
         }
         finally { Directory.Delete(directory, true); }
     }
@@ -183,6 +185,13 @@ internal static partial class Program
         public bool FailAuthorization { get; set; }
         public bool SessionExpired { get; set; }
         public int DelayMilliseconds { get; set; }
+        public bool MissingRange { get; set; }
+        public bool TimeoutRequests { get; set; }
+        public string PlanningTitleSuffix { get; set; } = "";
+        public string PlanningEventId { get; set; } = "a";
+        public string ProjectDescription { get; set; } = "";
+        public int ProjectDuration { get; set; } = 1;
+        public bool Disposed { get; private set; }
         public Task<bool> IsConnectedAsync(CancellationToken token) => Task.FromResult(Connected);
         public Task ConnectAsync(string id, string secret, CancellationToken token)
         {
@@ -196,12 +205,13 @@ internal static partial class Program
             if (DelayMilliseconds > 0) await Task.Delay(DelayMilliseconds, token);
             if (SessionExpired) throw new CalendarAuthorizationException("Session expired");
             if (FailRequests) throw new HttpRequestException("Offline test");
+            if (TimeoutRequests) throw new TaskCanceledException("Network timeout");
             var today = new DateTimeOffset(DateTime.Today);
             return new CalendarSnapshot([new("work", "Work", "#92ACFF"), new("personal", "Personal", "#67D7B0")],
-                [new("a", "work", "Planning session", today.AddHours(10), today.AddHours(11), false, "#92ACFF", "Office", "Weekly planning"),
-                 new("b", "work", "Project day", today, today.AddDays(1), true, "#92ACFF", "", ""),
-                 new("c", "personal", "Overnight event", today.AddHours(-2), today.AddHours(2), false, "#67D7B0", "", "")], DateTimeOffset.Now, start, end);
+                [new(PlanningEventId, "work", "Planning session" + PlanningTitleSuffix, today.AddHours(10), today.AddHours(11), false, "#92ACFF", "Office", "Weekly planning"),
+                 new("b", "work", "Project day", today, today.AddDays(ProjectDuration), true, "#92ACFF", "", ProjectDescription),
+                 new("c", "personal", "Overnight event", today.AddHours(-2), today.AddHours(2), false, "#67D7B0", "", "")], DateTimeOffset.Now, MissingRange ? default : start, MissingRange ? default : end);
         }
-        public void Dispose() { }
+        public void Dispose() { Disposed = true; }
     }
 }

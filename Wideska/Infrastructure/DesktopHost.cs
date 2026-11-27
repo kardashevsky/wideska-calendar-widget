@@ -15,6 +15,7 @@ public sealed class DesktopHost : IDisposable
     private readonly HwndSource source;
     private readonly WinEventCallback foregroundCallback;
     private IntPtr foregroundHook;
+    private bool disposed;
     public bool IsAttached { get; private set; }
     public IntPtr ParentHandle => GetParent(handle);
     public event Action? GeometryChanged;
@@ -159,5 +160,16 @@ public sealed class DesktopHost : IDisposable
         if (IsAttached && message is 0x7E or 0x2E0) { window.Dispatcher.BeginInvoke(() => { ApplyMonitorScale(); RecoverToScreen(); }); }
         return IntPtr.Zero;
     }
-    public void Dispose() { Detach(); source.RemoveHook(Hook); }
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        try { Detach(); }
+        finally
+        {
+            if (foregroundHook != IntPtr.Zero) { UnhookWinEvent(foregroundHook); foregroundHook = IntPtr.Zero; }
+            IsAttached = false;
+            source.RemoveHook(Hook);
+        }
+    }
 }
