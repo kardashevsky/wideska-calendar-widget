@@ -30,7 +30,7 @@ internal static partial class Program
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(menuImage));
         System.IO.Directory.CreateDirectory("artifacts");
         using (var file = System.IO.File.Create("artifacts/tray-menu.png")) encoder.Save(file);
-        void Click(string label) => desktop.TrayMenu.Items.OfType<MenuItem>().Single(i => (string)i.Header == label).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        void Click(string label) => desktop.TrayMenu.Items.OfType<MenuItem>().Single(i => (string)i.Tag == label).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Click("Show widget"); Check(window.IsVisible, "Show menu action");
         Click("Hide widget (keep running)"); Check(!window.IsVisible && !exit, "Hide must keep the process running");
         Click("Settings / Google sign-in"); Check(window.IsVisible && settings, "Settings must reveal the window and request settings or sign-in");

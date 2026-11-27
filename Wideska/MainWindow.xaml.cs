@@ -11,6 +11,7 @@ using Wideska.Services;
 using Wideska.ViewModels;
 
 namespace Wideska;
+
 public partial class MainWindow : Window
 {
     private readonly MainViewModel model;
@@ -20,9 +21,12 @@ public partial class MainWindow : Window
     private bool loadStarted;
     private bool quitting;
     private bool? appliedStartup;
+    private bool? appliedDarkTheme;
+    private double appliedTintOpacity = double.NaN;
     private bool? widgetDisplayed;
     private Point? dragPoint;
     private bool changingGeometryMode;
+    private int transitionVersion;
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     public MainWindow() : this(CreateViewModel(), true) { }
     private static MainViewModel CreateViewModel()
@@ -36,13 +40,12 @@ public partial class MainWindow : Window
         model = viewModel;
         this.enableDesktopIntegration = enableDesktopIntegration;
         DataContext = model;
-        model.AppearanceChanged += ApplyAppearance;
-        IsVisibleChanged += (_, _) => model.SetClockVisible(IsVisible);
-        model.FitDesktopRequested += FitDesktop;
+        IsVisibleChanged += (_, _) => { model.SetClockVisible(IsVisible); if (!IsVisible) StopNavigationTransition(); };
         MouseMove += OnMove;
+        PreviewKeyDown += OnPreviewKeyDown;
         MouseLeftButtonUp += (_, _) => { dragPoint = null; Mouse.Capture(null); };
         LocationChanged += (_, _) => QueueGeometrySave();
-        SizeChanged += (_, _) => QueueGeometrySave();
+        SizeChanged += (_, _) => { UpdateWidgetClip(); QueueGeometrySave(); };
         geometryTimer.Tick += async (_, _) =>
         {
             geometryTimer.Stop();
@@ -55,6 +58,10 @@ public partial class MainWindow : Window
     {
         if (loadStarted) return;
         loadStarted = true;
+        model.AppearanceChanged += ApplyAppearance;
+        model.FitDesktopRequested += FitDesktop;
+        model.PropertyChanged += OnModelPropertyChanged;
+        Timeline.ViewportChanged += UpdateTodayVisibility;
         if (!enableDesktopIntegration) { ApplyAppearance(); return; }
         try
         {
@@ -67,32 +74,160 @@ public partial class MainWindow : Window
             desktop.Host.GeometryChanged += QueueGeometrySave;
             await model.InitializeAsync();
             if (quitting) return;
+            if (quitting) return;
             initialized = true;
             ApplyAppearance();
             QueueGeometrySave();
         }
         catch (Exception ex) { model.ReportError(ex); }
     }
+    private void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.WidgetCornerRadius)) UpdateWidgetClip();
+        if (e.PropertyName is nameof(MainViewModel.SettingsOpen) or nameof(MainViewModel.IsEventOpen) or nameof(MainViewModel.ShowWidget)) StopNavigationTransition();
+    }
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || e.OriginalSource is System.Windows.Controls.ComboBox { IsDropDownOpen: true }) return;
+        if (model.IsEventOpen) model.CloseEventCommand.Execute(null);
+        else if (model.SettingsOpen) model.SettingsOpen = false;
+        else return;
+        e.Handled = true;
+    }
+    private void StopNavigationTransition()
+    {
+        ++transitionVersion;
+        if (CalendarContent is null || OutgoingCalendar is null) return;
+        CalendarContent.RenderTransform.BeginAnimation(TranslateTransform.XProperty, null);
+        CalendarContent.BeginAnimation(OpacityProperty, null);
+        OutgoingCalendar.RenderTransform.BeginAnimation(TranslateTransform.XProperty, null);
+        OutgoingCalendar.Visibility = Visibility.Collapsed;
+        OutgoingCalendar.Source = null;
+    }
+    protected override void OnClosed(EventArgs e)
+    {
+        geometryTimer.Stop();
+        StopNavigationTransition();
+        model.AppearanceChanged -= ApplyAppearance;
+        model.FitDesktopRequested -= FitDesktop;
+        model.PropertyChanged -= OnModelPropertyChanged;
+        Timeline.ViewportChanged -= UpdateTodayVisibility;
+        DataContext = null;
+        base.OnClosed(e);
+    }
+    private void UpdateTodayVisibility()
+    {
+        bool show = model.ShouldShowToday || model.IsDays && !Timeline.IsTodayColumnVisible;
+        TodayButton.SetCurrentValue(VisibilityProperty, show ? Visibility.Visible : Visibility.Collapsed);
+    }
+    private void OnShowToday(object sender, RoutedEventArgs e)
+    {
+        if (model.IsDays) Timeline.RevealToday();
+    }
+    private void OnHeaderSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (HeaderPeriod is null || HeaderNavigation is null || TodayButton is null) return;
+        // Reserve the optional button in the breakpoint calculation so showing it cannot shift the calendar vertically.
+        double navigationWidth = PreviousPeriodButton.Width + CalendarViewSelector.Width + NextPeriodButton.Width + 8;
+        double requiredWidth = navigationWidth + 148 + HeaderPeriod.DesiredSize.Width + 20;
+        bool narrow = CalendarHeader.ActualWidth < Math.Max(480, requiredWidth);
+        System.Windows.Controls.Grid.SetRow(HeaderNavigation, narrow ? 1 : 0);
+        HeaderPeriod.Margin = narrow ? new Thickness(0, 0, 0, 7) : new Thickness(0, 3, 0, 3);
+    }
+    private void OnNavigatePeriod(object sender, RoutedEventArgs e)
+    {
+        if (!SystemParameters.ClientAreaAnimation || CalendarContent.ActualWidth < 1 || CalendarContent.ActualHeight < 1) return;
+        int version = ++transitionVersion;
+        double direction = ReferenceEquals(sender, NextPeriodButton) ? 1 : -1;
+        double distance = CalendarContent.ActualWidth;
+        ((TranslateTransform)CalendarContent.RenderTransform).BeginAnimation(TranslateTransform.XProperty, null);
+        CalendarContent.BeginAnimation(OpacityProperty, null);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double captureScale = Math.Min(1, 2048 / Math.Max(CalendarContent.ActualWidth * dpi.DpiScaleX, CalendarContent.ActualHeight * dpi.DpiScaleY));
+        var snapshot = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            (int)Math.Ceiling(CalendarContent.ActualWidth * dpi.DpiScaleX * captureScale),
+            (int)Math.Ceiling(CalendarContent.ActualHeight * dpi.DpiScaleY * captureScale),
+            dpi.PixelsPerInchX * captureScale, dpi.PixelsPerInchY * captureScale, PixelFormats.Pbgra32);
+        var bounds = new Rect(0, 0, CalendarContent.ActualWidth, CalendarContent.ActualHeight);
+        var capture = new DrawingVisual();
+        using (var drawing = capture.RenderOpen())
+        {
+            // Capture local content coordinates; rendering the element directly includes its layout offset.
+            Vector layoutOffset = VisualTreeHelper.GetOffset(CalendarContent);
+            var brush = new VisualBrush(CalendarContent)
+            {
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(layoutOffset.X, layoutOffset.Y, bounds.Width, bounds.Height),
+                Stretch = Stretch.Fill,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top
+            };
+            drawing.DrawRectangle(brush, null, bounds);
+        }
+        snapshot.Render(capture);
+        snapshot.Freeze();
+        OutgoingCalendar.Source = snapshot;
+        OutgoingCalendar.Visibility = Visibility.Visible;
+        var duration = TimeSpan.FromMilliseconds(380);
+        System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames Motion(double from, double to, TimeSpan length)
+        {
+            var animation = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
+            { Duration = length, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
+            animation.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(from, TimeSpan.Zero));
+            animation.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(to, length,
+                new System.Windows.Media.Animation.KeySpline(.4, 0, .2, 1)));
+            return animation;
+        }
+        ((TranslateTransform)CalendarContent.RenderTransform).BeginAnimation(TranslateTransform.XProperty, Motion(direction * distance, 0, duration));
+        var outgoingSlide = Motion(0, -direction * distance, duration);
+        outgoingSlide.Completed += (_, _) =>
+        {
+            if (version != transitionVersion) return;
+            OutgoingCalendar.Visibility = Visibility.Collapsed;
+            OutgoingCalendar.Source = null;
+        };
+        ((TranslateTransform)OutgoingCalendar.RenderTransform).BeginAnimation(TranslateTransform.XProperty, outgoingSlide);
+    }
+    private void UpdateWidgetClip()
+    {
+        double radius = model.WidgetCornerRadius.TopLeft;
+        WidgetRoot.Clip = new RectangleGeometry(new Rect(0, 0, WidgetRoot.ActualWidth, WidgetRoot.ActualHeight), radius, radius);
+    }
     private void ApplyAppearance()
     {
+        if (quitting) return;
         bool dark = model.DarkTheme;
-        var colors = new Dictionary<string, string>
+        bool themeChanged = appliedDarkTheme != dark;
+        if (themeChanged)
         {
-            ["Surface"] = dark ? "#FA141A1F" : "#FAF5F7FA", ["Panel"] = dark ? "#FF253039" : "#FFE7EDF2",
-            ["Text"] = dark ? "#FFF1F5F9" : "#FF17212B", ["Muted"] = dark ? "#FFAFBDC9" : "#FF586B7C",
-            ["Line"] = dark ? "#24FFFFFF" : "#2417212B", ["Accent"] = dark ? "#FF8DD3EF" : "#FF24698C",
-            ["AccentFill"] = dark ? "#FF347E9F" : "#FF24698C",
-            ["TimelineCard"] = dark ? "#ED1D2730" : "#F2FFFFFF",
-            ["TimelineMuted"] = dark ? "#BBCAD5" : "#526574",
-            ["TimelineAxis"] = dark ? "#8098ACBA" : "#80607586",
-            ["TimelineGrid"] = dark ? "#38BBCAD5" : "#38607586",
-            ["TimelineNow"] = "#F43F5E",
-            ["Weekend"] = dark ? "#FDA4AF" : "#BE123C"
-        };
-        foreach (var pair in colors) Application.Current.Resources[pair.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));
-        var tint = (Color)ColorConverter.ConvertFromString(dark ? "#10181E" : "#F5F7FA");
-        tint.A = (byte)Math.Round(model.BackgroundOpacity * 255);
-        Application.Current.Resources["WidgetGlass"] = new SolidColorBrush(tint);
+            var colors = new Dictionary<string, string>
+            {
+                ["Surface"] = dark ? "#FA141A1F" : "#FAF5F7FA",
+                ["Panel"] = dark ? "#FF253039" : "#FFE7EDF2",
+                ["Text"] = dark ? "#FFF1F5F9" : "#FF17212B",
+                ["Muted"] = dark ? "#FFAFBDC9" : "#FF586B7C",
+                ["Line"] = dark ? "#24FFFFFF" : "#2417212B",
+                ["Accent"] = dark ? "#FF8DD3EF" : "#FF24698C",
+                ["WidgetOutline"] = dark ? "#80AFBDC9" : "#80526574",
+                ["AccentFill"] = dark ? "#FF347E9F" : "#FF24698C",
+                ["TimelineCard"] = dark ? "#ED1D2730" : "#F2FFFFFF",
+                ["TimelineMuted"] = dark ? "#BBCAD5" : "#526574",
+                ["TimelineAxis"] = dark ? "#8098ACBA" : "#80607586",
+                ["TimelineGrid"] = dark ? "#38BBCAD5" : "#38607586",
+                ["TimelineNow"] = "#FF304F",
+                ["TimelineTodayHeader"] = dark ? "#155E75" : "#C5F1FA",
+                ["Weekend"] = dark ? "#FDA4AF" : "#BE123C"
+            };
+            foreach (var pair in colors) Application.Current.Resources[pair.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));
+            appliedDarkTheme = dark;
+        }
+        if (themeChanged || appliedTintOpacity != model.BackgroundOpacity)
+        {
+            var tint = (Color)ColorConverter.ConvertFromString(dark ? "#10181E" : "#F5F7FA");
+            tint.A = (byte)Math.Round(model.BackgroundOpacity * 255);
+            Application.Current.Resources["WidgetGlass"] = new SolidColorBrush(tint);
+            appliedTintOpacity = model.BackgroundOpacity;
+        }
         // Only the glass brush is translucent; content and controls retain full opacity.
         Opacity = 1;
         if (desktop is not null)
@@ -143,7 +278,7 @@ public partial class MainWindow : Window
     }
     private async void OnImportCredentials(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Import Google Desktop OAuth client", Filter = "Google OAuth JSON (*.json)|*.json", Multiselect = false };
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = AppLocalization.Text("Import Google Desktop OAuth client"), Filter = AppLocalization.Text("Google OAuth JSON (*.json)|*.json"), Multiselect = false };
         if (dialog.ShowDialog(this) != true) return;
         try { await model.ImportCredentialsAsync(dialog.FileName); }
         catch (Exception ex) { model.ReportError(ex); }
@@ -262,6 +397,10 @@ public partial class MainWindow : Window
         CaptureGeometry();
         try { await model.ShutdownAsync(); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Unable to save Wideska settings", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        finally { desktop?.Dispose(); model.Dispose(); Application.Current.Shutdown(); }
+        finally
+        {
+            try { desktop?.Dispose(); }
+            finally { model.Dispose(); Application.Current.Shutdown(); }
+        }
     }
 }

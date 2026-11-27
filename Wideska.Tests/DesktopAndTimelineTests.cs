@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -73,7 +73,8 @@ internal static partial class Program
         Check(CalendarTime.IndicatorMinutes(new DateTime(2026,11,1), DateTimeOffset.Parse("2026-11-01T06:30Z"), "America/New_York") == 90, "Repeated DST hour must map to the repeated wall-clock hour");
         var events = new[] { new EventItem("A", "", "#9876CD", "A", false, 60, 180), new EventItem("B", "", "#9876CD", "B", false, 90, 120), new EventItem("C", "", "#9876CD", "C", false, 240, 300) };
         var layout = TimelineLayout.Arrange(events);
-        Check(layout[0].LaneCount == 2 && layout[1].Lane != layout[0].Lane && layout[2].LaneCount == 1, "Overlapping events must occupy separate lanes without narrowing unrelated events");
+        Check(layout[0].LaneCount == 2 && layout[1].Lane != layout[0].Lane && layout[2].LaneCount == 1, "Overlap groups must retain stable stacking offsets without narrowing unrelated events");
+        Check(layout[0].HorizontalOffset + layout[0].WidthFraction > layout[1].HorizontalOffset && layout[2].WidthFraction == 1, "Concurrent cards must overlap horizontally while unrelated cards keep their full width");
         var day = new DayCell(new DateTime(2026,3,8), true, true, events);
         var timeline = new Wideska.Controls.DayTimeline { Days = new[] { day }, TimeZoneId = "America/New_York", CurrentTime = instant, Foreground = System.Windows.Media.Brushes.White, Width = 600, Height = 1600 };
         timeline.Measure(new Size(600,1600)); timeline.Arrange(new Rect(0,0,600,1600)); timeline.UpdateLayout();
@@ -81,6 +82,9 @@ internal static partial class Program
         image.Render(timeline);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
         using (var file = System.IO.File.Create("artifacts/timeline.png")) encoder.Save(file);
+        double headerHeight = ((System.Windows.Media.DrawingVisual)System.Windows.Media.VisualTreeHelper.GetChild(timeline, 1)).ContentBounds.Height;
+        double overlapY = headerHeight + 100d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);
+        Check(timeline.EventAt(new Point(200, overlapY))?.Title == "A" && timeline.EventAt(new Point(300, overlapY))?.Title == "B", "Exposed rear cards and topmost overlapping cards must retain the correct click targets");
         Check(timeline.ActualHeight == 1600, "Timeline must scale to its available drawing height");
         await TestCalendarClockAndPersistenceAsync(System.IO.Path.Combine(directory, "clock"));
     }

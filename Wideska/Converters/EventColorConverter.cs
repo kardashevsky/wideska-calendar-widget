@@ -10,7 +10,7 @@ public sealed class EventColorConverter : IValueConverter
     {
         Color source;
         try { source = (Color)ColorConverter.ConvertFromString(value ?? "#38BDF8"); }
-        catch (FormatException) { source = Color.FromRgb(56, 189, 248); }
+        catch (Exception ex) when (ex is FormatException or NotSupportedException or ArgumentException) { source = Color.FromRgb(56, 189, 248); }
         double maximum = Math.Max(source.R, Math.Max(source.G, source.B));
         double minimum = Math.Min(source.R, Math.Min(source.G, source.B));
         double range = maximum - minimum;
@@ -28,9 +28,10 @@ public sealed class EventColorConverter : IValueConverter
         return luminance > .179 ? Brushes.Black : Brushes.White;
     }
 
-    public static Color CardColor(Wideska.ViewModels.EventItem item) => item.IsSleepCalendar ? Color.FromArgb(140, 18, 25, 33) : VibrantColor(item.Color);
+    public static Color CardColor(Wideska.ViewModels.EventItem item) => item.IsSleepCalendar ? Color.FromArgb(192, 18, 25, 33) : VibrantColor(item.Color);
     public static Brush CardTextBrush(Wideska.ViewModels.EventItem item) => item.IsSleepCalendar ? SleepText : TextBrush(CardColor(item));
     private static readonly Brush SleepText = new SolidColorBrush(Color.FromRgb(190, 201, 211));
+    static EventColorConverter() => SleepText.Freeze();
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {

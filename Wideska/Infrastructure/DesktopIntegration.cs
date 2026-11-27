@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Controls.Primitives;
 using Microsoft.Win32;
 using Wideska.Models;
+using Wideska.Services;
 
 namespace Wideska.Infrastructure;
 public sealed class DesktopIntegration : IDisposable
@@ -26,7 +27,7 @@ public sealed class DesktopIntegration : IDisposable
     private readonly MenuItem fitItem;
     private bool geometryLocked;
     private bool isDesktopFilled;
-    public bool IsDesktopFilled { get => isDesktopFilled; set { isDesktopFilled = value; fitItem.Header = value ? "Restore widget size" : "Fill desktop work area"; } }
+    public bool IsDesktopFilled { get => isDesktopFilled; set { isDesktopFilled = value; fitItem.SetResourceReference(HeaderedItemsControl.HeaderProperty, AppLocalization.Key(value ? "Restore widget size" : "Fill desktop work area")); } }
     public bool GeometryLocked
     {
         get => geometryLocked;
@@ -71,16 +72,23 @@ public sealed class DesktopIntegration : IDisposable
         source = HwndSource.FromHwnd(handle)!;
         source.AddHook(Hook);
         Host = new DesktopHost(window);
-        icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Wideska — desktop calendar", Info = "", Title = "" };
-        if (!Shell_NotifyIcon(0, ref icon))
+        try
         {
-            ApplicationIcon.DestroyIcon(icon.Icon); source.RemoveHook(Hook);
-            throw new InvalidOperationException("Unable to create the system tray icon.");
+            icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Wideska", Info = "", Title = "" };
+            if (!Shell_NotifyIcon(0, ref icon)) throw new InvalidOperationException("Unable to create the system tray icon.");
+        }
+        catch
+        {
+            Host.Dispose();
+            if (icon.Icon != IntPtr.Zero) ApplicationIcon.DestroyIcon(icon.Icon);
+            source.RemoveHook(Hook);
+            throw;
         }
     }
     private MenuItem AddMenuItem(string title, Action action)
     {
-        var item = new MenuItem { Header = title };
+        var item = new MenuItem { Tag = title };
+        item.SetResourceReference(HeaderedItemsControl.HeaderProperty, AppLocalization.Key(title));
         item.SetResourceReference(FrameworkElement.StyleProperty, "TrayMenuItem");
         item.Click += (_, _) => { TrayMenu.IsOpen = false; action(); };
         TrayMenu.Items.Add(item);

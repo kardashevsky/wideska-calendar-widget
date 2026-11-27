@@ -2,49 +2,46 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Wideska.Controls"
+        xmlns:infrastructure="clr-namespace:Wideska.Infrastructure"
         Title="Wideska" Icon="Resources/Icons/Wideska.ico" Width="480" Height="660" MinWidth="420" MinHeight="360"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" ShowActivated="False" Foreground="{DynamicResource Text}" FontFamily="Segoe UI" FontSize="13"
         Loaded="OnLoaded" Closing="OnClosing" StateChanged="OnStateChanged">
     <Grid>
         <!-- The calendar is never visible until the initial account check has completed. -->
-        <Border x:Name="WidgetRoot" IsEnabled="{Binding IsCalendarEnabled}" CornerRadius="{Binding WidgetCornerRadius}" Background="{DynamicResource WidgetGlass}" Padding="0"
+        <Border x:Name="WidgetRoot" IsEnabled="{Binding IsCalendarEnabled}" CornerRadius="{Binding WidgetCornerRadius}" Background="{DynamicResource WidgetGlass}" BorderBrush="{DynamicResource WidgetOutline}" BorderThickness="1" Padding="0"
                 Visibility="{Binding ShowWidget, Converter={StaticResource VisibleIf}}">
             <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <Grid Grid.Row="1" Margin="14,10,10,10" Background="Transparent" MouseLeftButtonDown="OnDrag">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Text="{Binding Period}" FontSize="25" FontWeight="SemiBold" TextWrapping="NoWrap"/>
-                    </Viewbox>
-                    <Border Grid.Column="1" Background="{DynamicResource WidgetGlass}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="9" Padding="3">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ComboBox Width="88" ItemsSource="{Binding Views}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding View}" ToolTip="Calendar view" AutomationProperties.Name="Calendar view" FontSize="11"/>
-                            <Border Width="1" Background="{DynamicResource Line}" Margin="5,4"/>
-                            <Button Content="Today" Command="{Binding TodayCommand}" FontSize="11" Padding="7,4"/>
-                            <Button Content="&#x2039;" Command="{Binding PreviousCommand}" FontSize="18" Padding="7,0" ToolTip="Previous period"/>
-                            <Button Content="&#x203A;" Command="{Binding NextCommand}" FontSize="18" Padding="7,0" ToolTip="Next period"/>
-                        </StackPanel>
-                    </Border>
+                <Grid x:Name="CalendarHeader" Grid.Row="1" Margin="12,7" Background="Transparent" MouseLeftButtonDown="OnDrag" SizeChanged="OnHeaderSizeChanged">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock SizeChanged="OnHeaderSizeChanged" x:Name="HeaderPeriod" Text="{Binding Period}" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center" TextWrapping="NoWrap" Margin="0,3"/>
+                    <StackPanel x:Name="HeaderNavigation" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" SizeChanged="OnHeaderSizeChanged">
+                        <Button Click="OnShowToday" x:Name="TodayButton" Visibility="{Binding ShouldShowToday, Converter={StaticResource VisibleIf}}" Content="{DynamicResource Ui.Today}" Command="{Binding TodayCommand}" Cursor="Hand" Background="{DynamicResource AccentFill}" Foreground="White" FontSize="12" FontWeight="SemiBold" MinWidth="116" Height="36" Padding="12,4" Margin="0,0,8,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        <Button Click="OnNavigatePeriod" x:Name="PreviousPeriodButton" Style="{StaticResource NavigationArrowButton}" Tag="M 8,0 L 2,6 L 8,12" Command="{Binding PreviousCommand}" ToolTip="{DynamicResource Ui.Previousperiod}" AutomationProperties.Name="{DynamicResource Ui.Previousperiod}" Margin="0,0,4,0"/>
+                        <ComboBox x:Name="CalendarViewSelector" Width="114" Height="40" Margin="0" Cursor="Hand" ItemsSource="{Binding Views}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding View}" ToolTip="{DynamicResource Ui.Calendarview}" AutomationProperties.Name="{DynamicResource Ui.Calendarview}" FontSize="12"/>
+                        <Button Click="OnNavigatePeriod" x:Name="NextPeriodButton" Style="{StaticResource NavigationArrowButton}" Tag="M 2,0 L 8,6 L 2,12" Command="{Binding NextCommand}" ToolTip="{DynamicResource Ui.Nextperiod}" AutomationProperties.Name="{DynamicResource Ui.Nextperiod}" Margin="4,0,0,0"/>
+                    </StackPanel>
                 </Grid>
                 <Grid x:Name="CalendarContent" Grid.Row="2" ClipToBounds="True">
+                    <Grid.RenderTransform><TranslateTransform/></Grid.RenderTransform>
                     <Grid Visibility="{Binding IsMonth, Converter={StaticResource VisibleIf}}">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <UniformGrid Columns="7" Margin="0,0,0,6" TextElement.FontSize="10">
-                            <TextBlock Text="MON" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
-                            <TextBlock Text="TUE" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
-                            <TextBlock Text="WED" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
-                            <TextBlock Text="THU" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
-                            <TextBlock Text="FRI" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
-                            <TextBlock Text="SAT" HorizontalAlignment="Center" Style="{StaticResource Caption}" Foreground="{DynamicResource Weekend}"/>
-                            <TextBlock Text="SUN" HorizontalAlignment="Center" Style="{StaticResource Caption}" Foreground="{DynamicResource Weekend}"/>
+                            <TextBlock Text="{DynamicResource Ui.MON}" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
+                            <TextBlock Text="{DynamicResource Ui.TUE}" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
+                            <TextBlock Text="{DynamicResource Ui.WED}" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
+                            <TextBlock Text="{DynamicResource Ui.THU}" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
+                            <TextBlock Text="{DynamicResource Ui.FRI}" HorizontalAlignment="Center" Style="{StaticResource Caption}"/>
+                            <TextBlock Text="{DynamicResource Ui.SAT}" HorizontalAlignment="Center" Style="{StaticResource Caption}" Foreground="{DynamicResource Weekend}"/>
+                            <TextBlock Text="{DynamicResource Ui.SUN}" HorizontalAlignment="Center" Style="{StaticResource Caption}" Foreground="{DynamicResource Weekend}"/>
                         </UniformGrid>
                         <ItemsControl Grid.Row="1" ItemsSource="{Binding Days}" ItemTemplate="{StaticResource MonthDayTemplate}">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                         </ItemsControl>
                     </Grid>
-                    <ScrollViewer ClipToBounds="True" Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <controls:DayTimeline x:Name="Timeline" ClockText="{Binding ClockText}" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
+                    <ScrollViewer Style="{StaticResource CalendarScrollViewer}" ClipToBounds="True" Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <controls:DayTimeline x:Name="Timeline" ClockText="{Binding ClockText}" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" TodayHeaderBrush="{DynamicResource TimelineTodayHeader}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
                     <Grid Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}">
                         <Viewbox Stretch="Uniform" MaxWidth="1440" HorizontalAlignment="Center" VerticalAlignment="Top">
@@ -67,39 +64,32 @@
                     </Viewbox>
                     </Grid>
                 </Grid>
-                <Grid x:Name="SyncStatus" Grid.Row="2" Height="16" Margin="8,0,8,4" VerticalAlignment="Bottom" HorizontalAlignment="Left" MaxWidth="240" IsHitTestVisible="False" Style="{StaticResource QuietSyncStatus}">
-                    <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" VerticalAlignment="Center">
-                        <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
-                            <DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="Visibility" Value="Hidden"/></DataTrigger>
-                        </Style.Triggers></Style></TextBlock.Style>
-                    </TextBlock>
-                    <Grid Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5" Style="{StaticResource SyncSpinner}" Visibility="{Binding Busy, Converter={StaticResource VisibleIf}}" AutomationProperties.Name="Synchronizing calendars">
-                        <Grid.RenderTransform><RotateTransform/></Grid.RenderTransform>
-                        <Path Data="M 7,1 A 6,6 0 1 1 1,7" Stroke="{DynamicResource Accent}" StrokeThickness="1.75" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                    </Grid>
-                </Grid>
-                <Border Grid.RowSpan="4" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="20" HorizontalAlignment="Right" Width="340" Visibility="{Binding SettingsOpen, Converter={StaticResource VisibleIf}}">
+                <Canvas Grid.Row="2" IsHitTestVisible="False" ClipToBounds="True">
+                    <Image x:Name="OutgoingCalendar" Canvas.Left="0" Canvas.Top="0" Width="{Binding ActualWidth, ElementName=CalendarContent}" Height="{Binding ActualHeight, ElementName=CalendarContent}" Visibility="Collapsed" Stretch="Fill"><Image.RenderTransform><TranslateTransform/></Image.RenderTransform></Image>
+                </Canvas>
+                <Border infrastructure:AppearanceAnimation.Enabled="True" Grid.RowSpan="4" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="20" HorizontalAlignment="Right" Width="340" Visibility="{Binding SettingsOpen, Converter={StaticResource VisibleIf}}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
-                        <DockPanel><Button DockPanel.Dock="Right" Content="Done" Command="{Binding SaveSettingsCommand}"/><TextBlock Text="Make it yours" FontSize="22" FontWeight="Light"/></DockPanel>
-                        <TextBlock Text="APPEARANCE" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
-                        <CheckBox Content="Light text for dark wallpapers" IsChecked="{Binding DarkTheme}"/>
-                        <TextBlock Text="Background tint" Margin="0,10,0,0"/>
-                        <Slider Minimum="0" Maximum="0.85" Value="{Binding BackgroundOpacity}" Margin="0,12,0,3" AutomationProperties.Name="Background tint opacity"/>
-                        <DockPanel><TextBlock DockPanel.Dock="Right" Text="More contrast" Style="{StaticResource Caption}" HorizontalAlignment="Right"/><TextBlock Text="Fully transparent" Style="{StaticResource Caption}"/></DockPanel>
-                        <TextBlock Text="Only the background changes. Text stays crisp." Style="{StaticResource Caption}" Margin="0,8,0,8"/>
-                        <TextBlock Text="ON YOUR DESKTOP" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
-                                                <TextBlock Text="Attached to the desktop, below application windows." Style="{StaticResource Caption}"/>
-                        <CheckBox Content="Lock position and size" IsChecked="{Binding GeometryLocked}"/>
+                        <DockPanel><Button DockPanel.Dock="Right" Content="{DynamicResource Ui.Done}" Command="{Binding SaveSettingsCommand}"/><TextBlock Text="{DynamicResource Ui.Makeityours}" FontSize="22" FontWeight="Light"/></DockPanel>
+                        <TextBlock Text="{DynamicResource Ui.Language}" Style="{StaticResource Caption}" Margin="0,16,0,4"/>
+                        <ComboBox ItemsSource="{Binding Languages}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding Language}" ToolTip="{DynamicResource Ui.Language}"/>
+                        <TextBlock Text="{DynamicResource Ui.APPEARANCE}" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
+                        <CheckBox Content="{DynamicResource Ui.Lighttextfordarkwallpapers}" IsChecked="{Binding DarkTheme}"/>
+                        <TextBlock Text="{DynamicResource Ui.Backgroundtint}" Margin="0,10,0,0"/>
+                        <Slider Minimum="0" Maximum="0.85" Value="{Binding BackgroundOpacity}" Margin="0,12,0,3" AutomationProperties.Name="{DynamicResource Ui.Backgroundtintopacity}"/>
+                        <DockPanel><TextBlock DockPanel.Dock="Right" Text="{DynamicResource Ui.Morecontrast}" Style="{StaticResource Caption}" HorizontalAlignment="Right"/><TextBlock Text="{DynamicResource Ui.Fullytransparent}" Style="{StaticResource Caption}"/></DockPanel>
+                        <TextBlock Text="{DynamicResource Ui.OnlythebackgroundchangesTextstayscrisp}" Style="{StaticResource Caption}" Margin="0,8,0,8"/>
+                        <TextBlock Text="{DynamicResource Ui.ONYOURDESKTOP}" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
+                                                <TextBlock Text="{DynamicResource Ui.Attachedtothedesktopbelowapplicationwindows}" Style="{StaticResource Caption}"/>
+                        <CheckBox Content="{DynamicResource Ui.Lockpositionandsize}" IsChecked="{Binding GeometryLocked}"/>
                         <Button Content="{Binding DesktopSizeActionLabel}" Command="{Binding FitDesktopCommand}" IsEnabled="{Binding CanEditGeometry}"/>
-                        <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}"/>
-                        <TextBlock Text="TIME ZONE" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
-                        <ComboBox ItemsSource="{Binding Calendars}" DisplayMemberPath="Calendar.Name" SelectedValuePath="Calendar.Id" SelectedValue="{Binding TimeZoneCalendarId}" ToolTip="Use the selected calendar time zone"/>
+                        <CheckBox Content="{DynamicResource Ui.StartwithWindows}" IsChecked="{Binding StartWithWindows}"/>
+                        <TextBlock Text="{DynamicResource Ui.TIMEZONE}" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
+                        <ComboBox ItemsSource="{Binding Calendars}" DisplayMemberPath="Calendar.Name" SelectedValuePath="Calendar.Id" SelectedValue="{Binding TimeZoneCalendarId}" ToolTip="{DynamicResource Ui.Usetheselectedcalendartimezone}"/>
                         <TextBlock Text="{Binding CalendarTimeZoneLabel}" Style="{StaticResource Caption}"/>
-                        <TextBlock Text="CALENDARS" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
+                        <TextBlock Text="{DynamicResource Ui.CALENDARS}" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
                         <ItemsControl ItemsSource="{Binding Calendars}"><ItemsControl.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding Visible}"><StackPanel Orientation="Horizontal"><Ellipse Width="7" Height="7" Fill="{Binding Calendar.Color}" Margin="0,0,8,0"/><TextBlock Text="{Binding Calendar.Name}" MaxWidth="240"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                        <TextBlock Text="Syncs automatically every minute." Style="{StaticResource Caption}" Margin="0,16,0,8"/>
-                        <Button Content="Disconnect Google account" Command="{Binding DisconnectCommand}" HorizontalAlignment="Left"/>
-                        <TextBlock Text="Drag the month heading to move. Drag any edge or corner to resize. Find the widget again in the system tray." Style="{StaticResource Caption}" Margin="0,12"/>
+                        <Button Content="{DynamicResource Ui.DisconnectGoogleaccount}" Command="{Binding DisconnectCommand}" HorizontalAlignment="Left"/>
+                        <TextBlock Text="{DynamicResource Ui.DragthemonthheadingtomoveDraganyedgeorcornertoresizeFindthewidgetagaininthesystemtray}" Style="{StaticResource Caption}" Margin="0,12"/>
                     </StackPanel></ScrollViewer>
                 </Border>
             </Grid>
@@ -115,24 +105,24 @@
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">
                     <StackPanel>
 
-                        <TextBlock Text="Your day.&#x0A;Part of your desktop." FontSize="30" FontWeight="Light" LineHeight="36"/>
-                        <TextBlock Text="Connect Google Calendar to bring your schedule onto your wallpaper." Foreground="{DynamicResource Muted}" Margin="0,12,0,18" FontSize="13"/>
+                        <TextBlock Text="{DynamicResource Ui.YourdayPartofyourdesktop}" FontSize="30" FontWeight="Light" LineHeight="36"/>
+                        <TextBlock Text="{DynamicResource Ui.ConnectGoogleCalendartobringyourscheduleontoyourwallpaper}" Foreground="{DynamicResource Muted}" Margin="0,12,0,18" FontSize="13"/>
                         <StackPanel x:Name="ConnectionForm">
                             <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger><DataTrigger Binding="{Binding IsInitialized}" Value="False"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
-                            <Button Content="Import Google OAuth file" Click="OnImportCredentials" BorderBrush="{DynamicResource Line}" Padding="12,10"/>
+                            <Button Content="{DynamicResource Ui.ImportGoogleOAuthfile}" Click="OnImportCredentials" BorderBrush="{DynamicResource Line}" Padding="12,10"/>
                             <TextBlock Text="{Binding CredentialStatus}" Style="{StaticResource Caption}" Margin="2,7,0,14"/>
-                            <Button Content="Continue with Google  →" Style="{StaticResource PrimaryButton}" Command="{Binding ConnectCommand}" IsEnabled="{Binding HasCredentials}"/>
-                            <TextBlock Text="Read-only access · Your events stay on this PC" Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,10,0,4"/>
-                            <Expander Header="First time? Set up Google connection" IsExpanded="True">
+                            <Button Content="{DynamicResource Ui.ContinuewithGoogle}" Style="{StaticResource PrimaryButton}" Command="{Binding ConnectCommand}" IsEnabled="{Binding HasCredentials}"/>
+                            <TextBlock Text="{DynamicResource Ui.ReadonlyaccessYoureventsstayonthisPC}" Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                            <Expander Header="{DynamicResource Ui.FirsttimeSetupGoogleconnection}" IsExpanded="True">
                                 <StackPanel Margin="4,12,0,0">
-                                    <TextBlock Text="1   Enable Google Calendar API in your Cloud project." FontSize="12" Margin="0,0,0,10"/>
-                                    <TextBlock Text="2   In Google Auth platform, configure consent and add your email as a test user. Create a Desktop app client and download its JSON file." FontSize="12" Margin="0,0,0,10"/>
-                                    <TextBlock Text="3   Import that file above, then continue with Google and allow calendar access in your browser." FontSize="12"/>
-                                    <WrapPanel Margin="0,8,0,0"><Button Content="Open Google Cloud ↗" Click="OnOpenGoogleCloud" FontSize="11" Foreground="{DynamicResource Accent}"/><Button Content="Setup guide ↗" Click="OnOpenGoogleGuide" FontSize="11" Foreground="{DynamicResource Accent}"/></WrapPanel>
+                                    <TextBlock Text="{DynamicResource Ui.1EnableGoogleCalendarAPIinyourCloudproject}" FontSize="12" Margin="0,0,0,10"/>
+                                    <TextBlock Text="{DynamicResource Ui.2InGoogleAuthplatformconfigureconsentandaddyouremailasatestuserCreateaDesktopappclientanddownloaditsJSONfile}" FontSize="12" Margin="0,0,0,10"/>
+                                    <TextBlock Text="{DynamicResource Ui.3ImportthatfileabovethencontinuewithGoogleandallowcalendaraccessinyourbrowser}" FontSize="12"/>
+                                    <WrapPanel Margin="0,8,0,0"><Button Content="{DynamicResource Ui.OpenGoogleCloud}" Click="OnOpenGoogleCloud" FontSize="11" Foreground="{DynamicResource Accent}"/><Button Content="{DynamicResource Ui.Setupguide}" Click="OnOpenGoogleGuide" FontSize="11" Foreground="{DynamicResource Accent}"/></WrapPanel>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="Enter OAuth credentials manually">
-                                <StackPanel Margin="0,10,0,0"><TextBlock Text="Desktop OAuth client ID" FontSize="12"/><TextBox Text="{Binding ClientId, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Desktop OAuth client secret" FontSize="12"/><TextBox Text="{Binding ClientSecret, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                            <Expander Header="{DynamicResource Ui.EnterOAuthcredentialsmanually}">
+                                <StackPanel Margin="0,10,0,0"><TextBlock Text="{DynamicResource Ui.DesktopOAuthclientID}" FontSize="12"/><TextBox Text="{Binding ClientId, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="{DynamicResource Ui.DesktopOAuthclientsecret}" FontSize="12"/><TextBox Text="{Binding ClientSecret, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
                             </Expander>
                         </StackPanel>
                     </StackPanel>
@@ -152,12 +142,12 @@
             <Thumb Tag="NE" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="SizeNESW" DragDelta="OnResize"/>
             <Thumb Tag="SW" Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="SizeNESW" DragDelta="OnResize"/>
         </Grid>
-        <Thumb Tag="SE" x:Name="ResizeGrip" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE" DragDelta="OnResize" Margin="0,0,4,4" Visibility="{Binding CanEditGeometry, Converter={StaticResource VisibleIf}}" ToolTip="Drag to resize">
-            <Thumb.Template><ControlTemplate TargetType="Thumb"><Grid Background="#01000000"><Path Data="M 8,18 L 18,8 M 13,18 L 18,13" Stroke="{DynamicResource Muted}" StrokeThickness="1" Opacity="0.6"/></Grid></ControlTemplate></Thumb.Template>
+        <Thumb Tag="SE" x:Name="ResizeGrip" Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE" DragDelta="OnResize" Margin="0,0,8,8" Visibility="{Binding CanEditGeometry, Converter={StaticResource VisibleIf}}" ToolTip="{DynamicResource Ui.Dragtoresize}">
+            <Thumb.Template><ControlTemplate TargetType="Thumb"><Grid Background="#01000000"><Path x:Name="GripLines" Data="M 9,18 L 18,9 M 14,18 L 18,14" Stroke="{DynamicResource Muted}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0.45"/></Grid><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="GripLines" Property="Stroke" Value="{DynamicResource Accent}"/><Setter TargetName="GripLines" Property="Opacity" Value="1"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template>
         </Thumb>
-        <Border x:Name="EventDetailsOverlay" Background="#99080C10" CornerRadius="{Binding WidgetCornerRadius}" Padding="24" Visibility="{Binding IsEventOpen, Converter={StaticResource VisibleIf}}">
+        <Border infrastructure:AppearanceAnimation.Enabled="True" x:Name="EventDetailsOverlay" Background="#99080C10" CornerRadius="{Binding WidgetCornerRadius}" Padding="24" Visibility="{Binding IsEventOpen, Converter={StaticResource VisibleIf}}">
             <Grid>
-                <Button Command="{Binding CloseEventCommand}" Background="Transparent" Padding="0" Margin="0" BorderThickness="0" Focusable="False" ToolTip="Back to calendar">
+                <Button Command="{Binding CloseEventCommand}" Background="Transparent" Padding="0" Margin="0" BorderThickness="0" Focusable="False" ToolTip="{DynamicResource Ui.Backtocalendar}">
                     <Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"/></ControlTemplate></Button.Template>
                 </Button>
                 <Border DataContext="{Binding SelectedEvent}" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="22" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -173,14 +163,14 @@
                                 <TextBlock Text="{Binding Time}" FontSize="16" FontWeight="Medium"/>
                                 <TextBlock Text="{Binding TimeZoneLabel}" Style="{StaticResource Caption}" Margin="0,5,0,16"/>
                                 <StackPanel Visibility="{Binding HasLocation, Converter={StaticResource VisibleIf}}" Margin="0,0,0,16">
-                                    <TextBlock Text="LOCATION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Location}" FontSize="13"/>
+                                    <TextBlock Text="{DynamicResource Ui.LOCATION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Location}" FontSize="13"/>
                                 </StackPanel>
                                 <StackPanel Visibility="{Binding HasDescription, Converter={StaticResource VisibleIf}}">
-                                    <TextBlock Text="DESCRIPTION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:LinkTextBlock ContentText="{Binding Description}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
+                                    <TextBlock Text="{DynamicResource Ui.DESCRIPTION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:LinkTextBlock ContentText="{Binding Description}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
-                        <Button Grid.Row="2" Content="Back to calendar" HorizontalAlignment="Right" Command="{Binding DataContext.CloseEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" BorderBrush="{DynamicResource Line}" Margin="0,18,0,0"/>
+                        <Button Grid.Row="2" Content="{DynamicResource Ui.Backtocalendar}" HorizontalAlignment="Right" Command="{Binding DataContext.CloseEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" BorderBrush="{DynamicResource Line}" Margin="0,18,0,0"/>
                     </Grid>
                 </Border>
             </Grid>

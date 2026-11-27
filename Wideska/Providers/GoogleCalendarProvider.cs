@@ -12,6 +12,7 @@ using Wideska.Models;
 using Wideska.Services;
 
 namespace Wideska.Providers;
+
 public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client = null) : ICalendarProvider
 {
     private const string TokenFile = "google-token.bin";
@@ -20,7 +21,7 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
     public sealed record TokenData(string AccessToken, string RefreshToken, DateTimeOffset Expires, string ClientId, string ClientSecret);
     public async Task<bool> IsConnectedAsync(CancellationToken token)
     {
-        credentials ??= await store.ReadAsync<TokenData>(TokenFile, true, token);
+        credentials ??= await store.ReadAsync<TokenData>(TokenFile, true, token).ConfigureAwait(false);
         return credentials is not null;
     }
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
@@ -39,64 +40,70 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
         string? code = null;
         while (code is null)
         {
-            using var client = await listener.AcceptTcpClientAsync(timeout.Token);
+            using var client = await listener.AcceptTcpClientAsync(timeout.Token).ConfigureAwait(false);
             using var stream = client.GetStream();
-            using var reader = new StreamReader(stream, Encoding.ASCII, false, 1024, true);
-            string? line = await reader.ReadLineAsync(timeout.Token);
+            using var connectionTimeout = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+            connectionTimeout.CancelAfter(TimeSpan.FromSeconds(5));
+            string? line;
+            try { line = await OAuthCallback.ReadRequestLineAsync(stream, connectionTimeout.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (!timeout.IsCancellationRequested) { continue; }
+            catch (IOException) { continue; }
             if (line is null) continue;
-            string target = line.Split(' ').ElementAtOrDefault(1) ?? "/";
-            var callback = new Uri(redirect.TrimEnd('/') + target);
-            var values = callback.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
-                .Select(p => p.Split('=', 2)).ToDictionary(p => Uri.UnescapeDataString(p[0]), p => p.Length > 1 ? Uri.UnescapeDataString(p[1].Replace('+', ' ')) : "");
-            bool valid = values.GetValueOrDefault("state") == state;
+            bool valid = OAuthCallback.TryParse(line, redirect, state, out var values);
             string message = valid ? "Wideska authorization received. You can close this tab." : "Invalid authorization state.";
             byte[] body = Encoding.UTF8.GetBytes(message);
-            await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {(valid ? "200 OK" : "400 Bad Request")}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"), timeout.Token);
-            await stream.WriteAsync(body, timeout.Token);
+            try
+            {
+                await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {(valid ? "200 OK" : "400 Bad Request")}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"), connectionTimeout.Token).ConfigureAwait(false);
+                await stream.WriteAsync(body, connectionTimeout.Token).ConfigureAwait(false);
+            }
+            catch (IOException) { continue; }
+            catch (OperationCanceledException) when (!timeout.IsCancellationRequested) { continue; }
             if (!valid) continue;
             if (values.ContainsKey("error")) throw new InvalidOperationException("Google authorization was declined.");
             code = values.GetValueOrDefault("code") ?? throw new InvalidOperationException("Google returned no authorization code.");
         }
-        credentials = await ExchangeAsync(new() { ["code"] = code, ["client_id"] = clientId.Trim(), ["client_secret"] = clientSecret.Trim(), ["redirect_uri"] = redirect, ["grant_type"] = "authorization_code", ["code_verifier"] = verifier }, clientId.Trim(), clientSecret.Trim(), "", token);
-        await store.WriteAsync(TokenFile, credentials, true, token);
+        credentials = await ExchangeAsync(new() { ["code"] = code, ["client_id"] = clientId.Trim(), ["client_secret"] = clientSecret.Trim(), ["redirect_uri"] = redirect, ["grant_type"] = "authorization_code", ["code_verifier"] = verifier }, clientId.Trim(), clientSecret.Trim(), "", token).ConfigureAwait(false);
+        await store.WriteAsync(TokenFile, credentials, true, token).ConfigureAwait(false);
     }
     private async Task<TokenData> ExchangeAsync(Dictionary<string, string> fields, string clientId, string secret, string refresh, CancellationToken token)
     {
-        using var response = await http.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(fields), token);
+        using var form = new FormUrlEncodedContent(fields);
+        using var response = await http.PostAsync("https://oauth2.googleapis.com/token", form, token).ConfigureAwait(false);
         if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             throw new CalendarAuthorizationException($"Google authorization failed ({(int)response.StatusCode}). Check your Desktop OAuth client and sign in again.");
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Google authorization service is unavailable ({(int)response.StatusCode}). Try again shortly.");
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
         var root = document.RootElement;
         return new(root.GetProperty("access_token").GetString()!, root.TryGetProperty("refresh_token", out var r) ? r.GetString()! : refresh,
             DateTimeOffset.UtcNow.AddSeconds(root.GetProperty("expires_in").GetInt32() - 60), clientId, secret);
     }
     private async Task EnsureTokenAsync(CancellationToken token)
     {
-        if (!await IsConnectedAsync(token)) throw new CalendarAuthorizationException("Sign in with Google to display your calendar.");
+        if (!await IsConnectedAsync(token).ConfigureAwait(false)) throw new CalendarAuthorizationException("Sign in with Google to display your calendar.");
         if (credentials!.Expires > DateTimeOffset.UtcNow) return;
-        credentials = await ExchangeAsync(new() { ["client_id"] = credentials.ClientId, ["client_secret"] = credentials.ClientSecret, ["refresh_token"] = credentials.RefreshToken, ["grant_type"] = "refresh_token" }, credentials.ClientId, credentials.ClientSecret, credentials.RefreshToken, token);
-        await store.WriteAsync(TokenFile, credentials, true, token);
+        credentials = await ExchangeAsync(new() { ["client_id"] = credentials.ClientId, ["client_secret"] = credentials.ClientSecret, ["refresh_token"] = credentials.RefreshToken, ["grant_type"] = "refresh_token" }, credentials.ClientId, credentials.ClientSecret, credentials.RefreshToken, token).ConfigureAwait(false);
+        await store.WriteAsync(TokenFile, credentials, true, token).ConfigureAwait(false);
     }
     public async Task DisconnectAsync(CancellationToken token)
     {
         // Remove local credentials even if revocation cannot be reached while offline.
-        var old = credentials ?? await store.ReadAsync<TokenData>(TokenFile, true, token);
+        var old = credentials ?? await store.ReadAsync<TokenData>(TokenFile, true, token).ConfigureAwait(false);
         credentials = null;
-        await store.DeleteAsync(TokenFile);
+        await store.DeleteAsync(TokenFile).ConfigureAwait(false);
         if (old is null) return;
-        try { using var response = await http.PostAsync("https://oauth2.googleapis.com/revoke", new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = old.RefreshToken }), token); }
+        try { using var form = new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = old.RefreshToken }); using var response = await http.PostAsync("https://oauth2.googleapis.com/revoke", form, token).ConfigureAwait(false); }
         catch (HttpRequestException) { }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { }
     }
     public async Task<CalendarSnapshot> GetSnapshotAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken token)
     {
-        await EnsureTokenAsync(token);
+        await EnsureTokenAsync(token).ConfigureAwait(false);
         List<CalendarInfo> calendars = [];
         string? page = null;
         do
         {
-            using var doc = await GetAsync("users/me/calendarList?maxResults=250" + (page is null ? "" : "&pageToken=" + Uri.EscapeDataString(page)), token);
+            using var doc = await GetAsync("users/me/calendarList?maxResults=250" + (page is null ? "" : "&pageToken=" + Uri.EscapeDataString(page)), token).ConfigureAwait(false);
             foreach (var item in doc.RootElement.GetProperty("items").EnumerateArray())
                 calendars.Add(new(Text(item, "id"), Text(item, "summary"), Text(item, "backgroundColor", "#7C9AFF"), Text(item, "timeZone"), item.TryGetProperty("primary", out var primary) && primary.GetBoolean()));
             page = Text(doc.RootElement, "nextPageToken", "");
@@ -108,7 +115,7 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
             do
             {
                 string path = "calendars/" + Uri.EscapeDataString(calendar.Id) + "/events?" + Query(new() { ["singleEvents"] = "true", ["orderBy"] = "startTime", ["maxResults"] = "2500", ["timeMin"] = start.ToString("O"), ["timeMax"] = end.ToString("O") }) + (page is null ? "" : "&pageToken=" + Uri.EscapeDataString(page));
-                using var doc = await GetAsync(path, token);
+                using var doc = await GetAsync(path, token).ConfigureAwait(false);
                 foreach (var item in doc.RootElement.GetProperty("items").EnumerateArray())
                 {
                     if (Text(item, "status") == "cancelled" || !item.TryGetProperty("start", out var s) || !item.TryGetProperty("end", out var e)) continue;
@@ -124,10 +131,10 @@ public sealed class GoogleCalendarProvider(LocalStore store, HttpClient? client 
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/calendar/v3/" + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials!.AccessToken);
-        using var response = await http.SendAsync(request, token);
+        using var response = await http.SendAsync(request, token).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.Unauthorized) throw new CalendarAuthorizationException("Your Google session has expired. Sign in again to display your calendar.");
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Google Calendar returned {(int)response.StatusCode}. Check your connection and account permissions.");
-        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
     }
     private static string Text(JsonElement element, string name, string fallback = "") => element.TryGetProperty(name, out var value) ? value.GetString() ?? fallback : fallback;
     private static DateTimeOffset ParseTime(JsonElement value) => value.TryGetProperty("dateTime", out var dt)

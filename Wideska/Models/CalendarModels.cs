@@ -4,6 +4,7 @@ public enum CalendarView { SingleDay, ThreeDays, Workweek, Week, Month, Year }
 public enum WindowBehavior { Normal, AlwaysOnTop, Desktop }
 public sealed class WidgetSettings
 {
+    public string Language { get; set; } = "system";
     public ScreenPlacement? DesktopPlacement { get; set; }
     public ScreenPlacement? RestorePlacement { get; set; }
     public bool IsDesktopFilled { get; set; }
