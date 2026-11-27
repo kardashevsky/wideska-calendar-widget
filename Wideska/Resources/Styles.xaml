@@ -144,21 +144,30 @@
             <ControlTemplate.Triggers><Trigger Property="Orientation" Value="Horizontal"><Setter Property="Width" Value="Auto"/><Setter Property="Height" Value="5"/><Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/><Setter TargetName="DecreasePage" Property="Command" Value="ScrollBar.PageLeftCommand"/><Setter TargetName="IncreasePage" Property="Command" Value="ScrollBar.PageRightCommand"/></Trigger></ControlTemplate.Triggers>
         </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="EventCardButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0"/>
+        <Setter Property="ContentTemplate" Value="{x:Null}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/></ControlTemplate></Setter.Value></Setter>
+    </Style>
     <DataTemplate x:Key="EventTemplate">
+        <Button Style="{StaticResource EventCardButton}" Command="{Binding DataContext.OpenEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
         <Grid Margin="0,4" ToolTip="{Binding Details}">
             <Border Background="{Binding Color}" Opacity="0.13" CornerRadius="10"/>
             <Border BorderBrush="{Binding Color}" BorderThickness="2,0,0,0" Padding="10,8" Margin="0,4">
                 <StackPanel><TextBlock Text="{Binding Time}" FontSize="10" Foreground="{DynamicResource Muted}" Margin="0,0,0,3"/><TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" MaxHeight="38"/></StackPanel>
             </Border>
         </Grid>
+        </Button>
     </DataTemplate>
     <DataTemplate x:Key="CompactEventTemplate">
+        <Button Style="{StaticResource EventCardButton}" Command="{Binding DataContext.OpenEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
         <Grid Margin="1,2" ToolTip="{Binding Details}">
             <Border Background="{Binding Color}" Opacity="0.16" CornerRadius="4"/>
             <Border BorderBrush="{Binding Color}" BorderThickness="2,0,0,0" Padding="5,3">
                 <TextBlock Text="{Binding Title}" FontSize="10" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
             </Border>
         </Grid>
+        </Button>
     </DataTemplate>
     <DataTemplate x:Key="MonthDayTemplate">
         <Border x:Name="Cell" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,0.5" Padding="2,3" ClipToBounds="True" ToolTip="{Binding Summary}">

@@ -8,7 +8,7 @@
         Loaded="OnLoaded" Closing="OnClosing" StateChanged="OnStateChanged">
     <Grid>
         <!-- The calendar is never visible until the initial account check has completed. -->
-        <Border x:Name="WidgetRoot" CornerRadius="24" Background="{DynamicResource WidgetGlass}" Padding="24,18,24,14"
+        <Border x:Name="WidgetRoot" IsEnabled="{Binding IsCalendarEnabled}" CornerRadius="{Binding WidgetCornerRadius}" Background="{DynamicResource WidgetGlass}" Padding="24,18,24,14"
                 Visibility="{Binding ShowWidget, Converter={StaticResource VisibleIf}}">
             <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -54,7 +54,7 @@
                         </ItemsControl>
                     </Grid>
                     <ScrollViewer Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <controls:DayTimeline x:Name="Timeline" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
+                        <controls:DayTimeline x:Name="Timeline" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
                     <Grid Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}">
                         <Viewbox Stretch="Uniform" MaxWidth="1440" HorizontalAlignment="Center" VerticalAlignment="Top">
@@ -93,7 +93,7 @@
                         <TextBlock Text="ON YOUR DESKTOP" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
                                                 <TextBlock Text="Attached to the desktop, below application windows." Style="{StaticResource Caption}"/>
                         <CheckBox Content="Lock position and size" IsChecked="{Binding GeometryLocked}"/>
-                        <Button Content="Fill desktop work area" Command="{Binding FitDesktopCommand}" IsEnabled="{Binding CanEditGeometry}"/>
+                        <Button Content="{Binding DesktopSizeActionLabel}" Command="{Binding FitDesktopCommand}" IsEnabled="{Binding CanEditGeometry}"/>
                         <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}"/>
                         <TextBlock Text="TIME ZONE" Style="{StaticResource Caption}" Margin="0,18,0,4"/>
                         <ComboBox ItemsSource="{Binding Calendars}" DisplayMemberPath="Calendar.Name" SelectedValuePath="Calendar.Id" SelectedValue="{Binding TimeZoneCalendarId}" ToolTip="Use the selected calendar time zone"/>
@@ -158,5 +158,35 @@
         <Thumb Tag="SE" x:Name="ResizeGrip" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE" DragDelta="OnResize" Margin="0,0,4,4" Visibility="{Binding CanEditGeometry, Converter={StaticResource VisibleIf}}" ToolTip="Drag to resize">
             <Thumb.Template><ControlTemplate TargetType="Thumb"><Grid Background="#01000000"><Path Data="M 8,18 L 18,8 M 13,18 L 18,13" Stroke="{DynamicResource Muted}" StrokeThickness="1" Opacity="0.6"/></Grid></ControlTemplate></Thumb.Template>
         </Thumb>
+        <Border x:Name="EventDetailsOverlay" Background="#99080C10" CornerRadius="{Binding WidgetCornerRadius}" Padding="24" Visibility="{Binding IsEventOpen, Converter={StaticResource VisibleIf}}">
+            <Grid>
+                <Button Command="{Binding CloseEventCommand}" Background="Transparent" Padding="0" Margin="0" BorderThickness="0" Focusable="False" ToolTip="Back to calendar">
+                    <Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"/></ControlTemplate></Button.Template>
+                </Button>
+                <Border DataContext="{Binding SelectedEvent}" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="22" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <StackPanel Margin="0,0,0,16">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12"><Ellipse Width="8" Height="8" Fill="{Binding Color}" Margin="0,0,8,0"/><TextBlock Text="{Binding CalendarName}" Style="{StaticResource Caption}"/></StackPanel>
+                            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="420">
+                            <StackPanel>
+                                <TextBlock Text="{Binding DateLabel}" FontSize="14" Margin="0,0,0,5"/>
+                                <TextBlock Text="{Binding Time}" FontSize="16" FontWeight="Medium"/>
+                                <TextBlock Text="{Binding TimeZoneLabel}" Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+                                <StackPanel Visibility="{Binding HasLocation, Converter={StaticResource VisibleIf}}" Margin="0,0,0,16">
+                                    <TextBlock Text="LOCATION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Location}" FontSize="13"/>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding HasDescription, Converter={StaticResource VisibleIf}}">
+                                    <TextBlock Text="DESCRIPTION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Description}" FontSize="13" LineHeight="20"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Button Grid.Row="2" Content="Back to calendar" HorizontalAlignment="Right" Command="{Binding DataContext.CloseEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" BorderBrush="{DynamicResource Line}" Margin="0,18,0,0"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

@@ -5,6 +5,8 @@ public enum WindowBehavior { Normal, AlwaysOnTop, Desktop }
 public sealed class WidgetSettings
 {
     public ScreenPlacement? DesktopPlacement { get; set; }
+    public ScreenPlacement? RestorePlacement { get; set; }
+    public bool IsDesktopFilled { get; set; }
     public bool GeometryLocked { get; set; }
     public string TimeZoneCalendarId { get; set; } = "";
     public double Left { get; set; } = 100;

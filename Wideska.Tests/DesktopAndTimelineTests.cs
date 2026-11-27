@@ -65,6 +65,7 @@ internal static partial class Program
     }
     private static async Task TestTimeIndicatorAsync(Application app, string directory)
     {
+        Check(EventText.ToPlainText("<p>Review &amp; plan</p><ul><li>One</li><li>Two</li></ul>") == "Review & plan\n• One\n• Two", "Google HTML descriptions must become readable plain text");
         var instant = DateTimeOffset.Parse("2026-03-08T07:30:00Z");
         Check(CalendarTime.IndicatorMinutes(new DateTime(2026,3,8), instant, "America/New_York") == 210, "DST spring transition must use calendar-local 03:30");
         Check(CalendarTime.IndicatorMinutes(new DateTime(2026,3,7), instant, "America/New_York") is null, "Indicator must be absent from other dates");
