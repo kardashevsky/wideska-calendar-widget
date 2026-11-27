@@ -122,6 +122,8 @@ public partial class MainWindow : Window
     }
     private void OnShowToday(object sender, RoutedEventArgs e)
     {
+        int direction = model.ShouldShowToday ? model.TodayNavigationDirection : Timeline.TodayNavigationDirection;
+        BeginPeriodTransition(direction == 0 ? 1 : direction);
         if (model.IsDays) Timeline.RevealToday();
     }
     private void OnHeaderSizeChanged(object sender, SizeChangedEventArgs e)
@@ -135,10 +137,11 @@ public partial class MainWindow : Window
         HeaderPeriod.Margin = narrow ? new Thickness(0, 0, 0, 7) : new Thickness(0, 3, 0, 3);
     }
     private void OnNavigatePeriod(object sender, RoutedEventArgs e)
+        => BeginPeriodTransition(ReferenceEquals(sender, NextPeriodButton) ? 1 : -1);
+    private void BeginPeriodTransition(double direction)
     {
         if (!SystemParameters.ClientAreaAnimation || CalendarContent.ActualWidth < 1 || CalendarContent.ActualHeight < 1) return;
         int version = ++transitionVersion;
-        double direction = ReferenceEquals(sender, NextPeriodButton) ? 1 : -1;
         double distance = CalendarContent.ActualWidth;
         ((TranslateTransform)CalendarContent.RenderTransform).BeginAnimation(TranslateTransform.XProperty, null);
         CalendarContent.BeginAnimation(OpacityProperty, null);
