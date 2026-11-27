@@ -276,40 +276,38 @@ public sealed class DayTimeline : Control
     }
     private void Event(DrawingContext dc, EventItem item, Rect rect, bool timed)
     {
-        Brush color;
-        try { color = new SolidColorBrush((Color)ColorConverter.ConvertFromString(item.Color)); }
-        catch (FormatException) { color = AccentBrush; }
+        var fill = Wideska.Converters.EventColorConverter.VibrantColor(item.Color);
+        Brush color = new SolidColorBrush(fill);
+        Brush textBrush = Wideska.Converters.EventColorConverter.TextBrush(fill);
         bool highlighted = item.Details == hover;
         double radius = timed ? Math.Min(8, rect.Height / 2) : 5;
         var shape = new RectangleGeometry(rect, radius, radius);
         dc.PushClip(shape);
-        dc.DrawRoundedRectangle(SurfaceBrush, null, rect, radius, radius);
-        dc.PushOpacity(highlighted ? .2 : .12);
-        dc.DrawRoundedRectangle(color, null, rect, radius, radius); dc.Pop();
+        dc.DrawRoundedRectangle(color, null, rect, radius, radius);
         dc.PushOpacity(highlighted ? .75 : .3);
-        dc.DrawRoundedRectangle(null, new Pen(color, highlighted ? 1.5 : 1), rect, radius, radius); dc.Pop();
+        dc.DrawRoundedRectangle(null, new Pen(textBrush, highlighted ? 1.5 : 1), rect, radius, radius); dc.Pop();
         if (!timed)
         {
-            dc.DrawEllipse(color, null, new Point(rect.X + 11, rect.Y + rect.Height / 2), 3, 3);
-            Text(dc, item.Title, rect.X + 21, rect.Y + 4, rect.Width - 29, 11, Foreground, FontWeights.Medium);
+            dc.DrawEllipse(textBrush, null, new Point(rect.X + 11, rect.Y + rect.Height / 2), 3, 3);
+            Text(dc, item.Title, rect.X + 21, rect.Y + 4, rect.Width - 29, 11, textBrush, FontWeights.Medium);
         }
         else
         {
             // Keep the strong calendar-color accent inside the side of the card.
             if (rect.Height > 20)
-                dc.DrawRoundedRectangle(color, null, new Rect(rect.X + 4, rect.Y + 9, 3, Math.Max(2, rect.Height - 18)), 1.5, 1.5);
+                dc.DrawRoundedRectangle(textBrush, null, new Rect(rect.X + 4, rect.Y + 9, 3, Math.Max(2, rect.Height - 18)), 1.5, 1.5);
             string start = TimeSpan.FromMinutes(Math.Clamp(item.StartMinute, 0, 1440)).ToString(@"hh\:mm");
             if (rect.Height >= 46)
             {
                 string time = string.IsNullOrEmpty(item.Time) ? start : item.Time;
-                Text(dc, time, rect.X + 14, rect.Y + 8, rect.Width - 24, 10, MutedBrush, FontWeights.Medium);
-                Text(dc, item.Title, rect.X + 14, rect.Y + 25, rect.Width - 24, 13, Foreground, FontWeights.SemiBold);
+                Text(dc, time, rect.X + 14, rect.Y + 8, rect.Width - 24, 10, textBrush, FontWeights.Medium);
+                Text(dc, item.Title, rect.X + 14, rect.Y + 25, rect.Width - 24, 13, textBrush, FontWeights.SemiBold);
             }
             else if (rect.Height >= 20)
             {
                 double badgeWidth = Math.Min(39, rect.Width * .4);
-                Text(dc, start, rect.X + 12, rect.Y + 5, badgeWidth, 10, MutedBrush, FontWeights.Medium);
-                Text(dc, item.Title, rect.X + badgeWidth + 17, rect.Y + 4, rect.Width - badgeWidth - 24, 11, Foreground, FontWeights.Medium);
+                Text(dc, start, rect.X + 12, rect.Y + 5, badgeWidth, 10, textBrush, FontWeights.Medium);
+                Text(dc, item.Title, rect.X + badgeWidth + 17, rect.Y + 4, rect.Width - badgeWidth - 24, 11, textBrush, FontWeights.Medium);
             }
         }
         dc.Pop(); (drawingHeader ? headerHits : hits).Add((rect, item.Details, item));

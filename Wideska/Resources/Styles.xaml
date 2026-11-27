@@ -1,4 +1,5 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:converters="clr-namespace:Wideska.Converters">
+    <converters:EventColorConverter x:Key="EventColor"/>
     <SolidColorBrush x:Key="Surface" Color="#F2141A1F"/>
     <SolidColorBrush x:Key="Panel" Color="#FF253039"/>
     <SolidColorBrush x:Key="WidgetGlass" Color="#2410181E"/>
@@ -169,18 +170,18 @@
     </Style>
     <DataTemplate x:Key="EventTemplate">
         <Button Style="{StaticResource EventCardButton}" Command="{Binding DataContext.OpenEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
-        <Grid Margin="0,4" ToolTip="{Binding Details}">
-            <Border Background="{Binding Color}" Opacity="0.13" CornerRadius="10"/>
+        <Grid Margin="0,4" ToolTip="{Binding Details}" TextElement.Foreground="{Binding Color, Converter={StaticResource EventColor}, ConverterParameter=Text}">
+            <Border Background="{Binding Color, Converter={StaticResource EventColor}}" CornerRadius="10"/>
             <Border BorderBrush="{Binding Color}" BorderThickness="2,0,0,0" Padding="10,8" Margin="0,4">
-                <StackPanel><TextBlock Text="{Binding Time}" FontSize="10" Foreground="{DynamicResource Muted}" Margin="0,0,0,3"/><TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" MaxHeight="38"/></StackPanel>
+                <StackPanel><TextBlock Text="{Binding Time}" FontSize="10" Margin="0,0,0,3"/><TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" MaxHeight="38"/></StackPanel>
             </Border>
         </Grid>
         </Button>
     </DataTemplate>
     <DataTemplate x:Key="CompactEventTemplate">
         <Button Style="{StaticResource EventCardButton}" Command="{Binding DataContext.OpenEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
-        <Grid Margin="1,2" ToolTip="{Binding Details}">
-            <Border Background="{Binding Color}" Opacity="0.16" CornerRadius="4"/>
+        <Grid Margin="1,2" ToolTip="{Binding Details}" TextElement.Foreground="{Binding Color, Converter={StaticResource EventColor}, ConverterParameter=Text}">
+            <Border Background="{Binding Color, Converter={StaticResource EventColor}}" CornerRadius="4"/>
             <Border BorderBrush="{Binding Color}" BorderThickness="2,0,0,0" Padding="5,3">
                 <TextBlock Text="{Binding Title}" FontSize="10" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
             </Border>
