@@ -16,6 +16,10 @@ internal static partial class Program
         double initialTop = header.TransformToAncestor(window).Transform(new Point()).Y;
         viewer.ScrollToVerticalOffset(600);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        double savedOffset = viewer.VerticalOffset;
+        await ((Wideska.ViewModels.MainViewModel)window.DataContext).RefreshAsync();
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Check(Math.Abs(viewer.VerticalOffset - savedOffset) < .5, "Calendar synchronization must preserve the manually selected scroll position");
         double afterTop = header.TransformToAncestor(window).Transform(new Point()).Y;
         Check(viewer.VerticalOffset > 0 && Math.Abs(afterTop - initialTop) < .5, "Day/date and all-day header must stay at the same screen position while hours scroll");
         Check(timeline.Clip is RectangleGeometry viewportClip && Math.Abs(viewportClip.Rect.Top - viewer.VerticalOffset) < .5 && Math.Abs(viewportClip.Rect.Height - viewer.ViewportHeight) < .5, "Timeline visuals must be clipped to the viewport so scrolled events cannot leak above the header");
