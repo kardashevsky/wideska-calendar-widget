@@ -149,9 +149,9 @@ public sealed class DayTimeline : Control
     }
     public const double MinimumTimelineHeight = 1480;
     public const double TimeGutterWidth = 96;
-    private const double DayHeaderHeight = 48;
-    private const double AllDayRowHeight = 28;
-    private double TimeStart(IReadOnlyList<DayCell> days) => DayHeaderHeight + Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay))) * AllDayRowHeight + 24;
+    private const double DayHeaderHeight = 36;
+    private const double AllDayRowHeight = 24;
+    private double TimeStart(IReadOnlyList<DayCell> days) => DayHeaderHeight + Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay))) * AllDayRowHeight + 16;
     private void Text(DrawingContext dc, string text, double x, double y, double width, double size = 12, Brush? brush = null, FontWeight? weight = null, TextAlignment alignment = TextAlignment.Left)
     {
         if (width < 2) return;
@@ -178,7 +178,7 @@ public sealed class DayTimeline : Control
         var gridPen = new Pen(GridBrush, 1);
         if (days.Count > 1 && today >= 0)
         {
-            dc.PushOpacity(.06);
+            dc.PushOpacity(.035);
             dc.DrawRectangle(AccentBrush, null, new Rect(TimeGutterWidth + today * column, startY, column, timelineHeight));
             dc.Pop();
         }
@@ -234,8 +234,8 @@ public sealed class DayTimeline : Control
         Brush background = SurfaceBrush;
         if (SurfaceBrush is SolidColorBrush solid) background = new SolidColorBrush(Color.FromRgb(solid.Color.R, solid.Color.G, solid.Color.B));
         dc.DrawRectangle(background, null, new Rect(0, 0, ActualWidth, headerHeight));
-        Text(dc, "TIME", 8, 17, TimeGutterWidth - 16, 9, MutedBrush, FontWeights.SemiBold);
-        if (allDayRows > 0) Text(dc, "ALL DAY", 6, DayHeaderHeight + 7, TimeGutterWidth - 14, 9, MutedBrush, FontWeights.Medium);
+        Text(dc, "TIME", 8, 11, TimeGutterWidth - 16, 9, MutedBrush, FontWeights.SemiBold);
+        if (allDayRows > 0) Text(dc, "ALL DAY", 6, DayHeaderHeight + 5, TimeGutterWidth - 14, 9, MutedBrush, FontWeights.Medium);
         drawingHeader = true;
         try
         {
@@ -245,15 +245,15 @@ public sealed class DayTimeline : Control
                 headerHits.Add((new Rect(x, 0, column, headerHeight), day.Summary, null));
                 if (index == today)
                 {
-                    dc.PushOpacity(.12); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 6, 4, Math.Max(1, column - 12), 34), 10, 10); dc.Pop();
-                    dc.DrawLine(new Pen(AccentBrush, 2), new Point(x + 8, headerHeight - 1), new Point(x + column - 8, headerHeight - 1));
+                    dc.PushOpacity(.065); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 8, 3, Math.Max(1, column - 16), 28), 6, 6); dc.Pop();
+                    dc.DrawLine(new Pen(AccentBrush, 1), new Point(x + 8, headerHeight - 1), new Point(x + column - 8, headerHeight - 1));
                 }
                 Brush label = day.IsWeekend ? WeekendBrush : index == today ? AccentBrush : Foreground;
-                Text(dc, day.Label, x + 14, 12, column - 24, 13, label, index == today ? FontWeights.SemiBold : FontWeights.Medium);
+                Text(dc, day.Label, x + 14, 8, column - 24, 12, label, FontWeights.Medium);
                 int row = 0;
                 foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))
-                    Event(dc, item, new Rect(x + 8, DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - 16), 24), false);
-                if (day.Events.Count(e => e.AllDay) > allDayRows) Text(dc, "More all-day events", x + 12, headerHeight - 18, column - 24, 10, MutedBrush);
+                    Event(dc, item, new Rect(x + 8, DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - 16), 22), false);
+                if (day.Events.Count(e => e.AllDay) > allDayRows) Text(dc, "More all-day events", x + 12, headerHeight - 14, column - 24, 9, MutedBrush);
             }
         }
         finally { drawingHeader = false; }
