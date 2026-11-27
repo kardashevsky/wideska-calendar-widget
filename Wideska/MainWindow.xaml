@@ -8,32 +8,24 @@
         Loaded="OnLoaded" Closing="OnClosing" StateChanged="OnStateChanged">
     <Grid>
         <!-- The calendar is never visible until the initial account check has completed. -->
-        <Border x:Name="WidgetRoot" IsEnabled="{Binding IsCalendarEnabled}" CornerRadius="{Binding WidgetCornerRadius}" Background="{DynamicResource WidgetGlass}" Padding="24,18,24,14"
+        <Border x:Name="WidgetRoot" IsEnabled="{Binding IsCalendarEnabled}" CornerRadius="{Binding WidgetCornerRadius}" Background="{DynamicResource WidgetGlass}" Padding="0"
                 Visibility="{Binding ShowWidget, Converter={StaticResource VisibleIf}}">
             <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <Grid Grid.Row="1" Margin="0,0,0,18" Background="Transparent" MouseLeftButtonDown="OnDrag">
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" Margin="0,0,0,8">
-                        <TextBlock Text="{Binding Period}" FontSize="42" FontWeight="SemiBold" TextWrapping="NoWrap"/>
+                <Grid Grid.Row="1" Margin="14,10,10,10" Background="Transparent" MouseLeftButtonDown="OnDrag">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock Text="{Binding Period}" FontSize="25" FontWeight="SemiBold" TextWrapping="NoWrap"/>
                     </Viewbox>
-                    <DockPanel Grid.Row="1" Margin="0,0,0,12" Visibility="{Binding IsSingleDay, Converter={StaticResource VisibleIf}}">
-
-                        <TextBlock Text="{Binding DayHeading}" FontSize="17" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
-                            <TextBlock.Style><Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
-                                <Style.Triggers><DataTrigger Binding="{Binding IsWeekendHeading}" Value="True"><Setter Property="Foreground" Value="{DynamicResource Weekend}"/></DataTrigger></Style.Triggers>
-                            </Style></TextBlock.Style>
-                        </TextBlock>
-                    </DockPanel>
-                    <DockPanel Grid.Row="2">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button Content="Today" Command="{Binding TodayCommand}" FontSize="11" Padding="8,4"/>
-                            <Button Content="‹" Command="{Binding PreviousCommand}" FontSize="18" Padding="9,1" ToolTip="Previous period"/>
-                            <Button Content="›" Command="{Binding NextCommand}" FontSize="18" Padding="9,1" ToolTip="Next period"/>
+                    <Border Grid.Column="1" Background="{DynamicResource WidgetGlass}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="9" Padding="3">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ComboBox Width="88" ItemsSource="{Binding Views}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding View}" ToolTip="Calendar view" AutomationProperties.Name="Calendar view" FontSize="11"/>
+                            <Border Width="1" Background="{DynamicResource Line}" Margin="5,4"/>
+                            <Button Content="Today" Command="{Binding TodayCommand}" FontSize="11" Padding="7,4"/>
+                            <Button Content="&#x2039;" Command="{Binding PreviousCommand}" FontSize="18" Padding="7,0" ToolTip="Previous period"/>
+                            <Button Content="&#x203A;" Command="{Binding NextCommand}" FontSize="18" Padding="7,0" ToolTip="Next period"/>
                         </StackPanel>
-                        <ComboBox HorizontalAlignment="Left" ItemsSource="{Binding Views}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding View}" ToolTip="Calendar view" AutomationProperties.Name="Calendar view" FontSize="11"/>
-                    </DockPanel>
+                    </Border>
                 </Grid>
                 <Grid x:Name="CalendarContent" Grid.Row="2" ClipToBounds="True">
                     <Grid Visibility="{Binding IsMonth, Converter={StaticResource VisibleIf}}">
@@ -75,7 +67,7 @@
                     </Viewbox>
                     </Grid>
                 </Grid>
-                <Grid x:Name="SyncStatus" Grid.Row="3" Height="16" Margin="0,8,0,0" Style="{StaticResource QuietSyncStatus}">
+                <Grid x:Name="SyncStatus" Grid.Row="2" Height="16" Margin="8,0,8,4" VerticalAlignment="Bottom" HorizontalAlignment="Left" MaxWidth="240" IsHitTestVisible="False" Style="{StaticResource QuietSyncStatus}">
                     <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" VerticalAlignment="Center">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
                             <DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="Visibility" Value="Hidden"/></DataTrigger>
