@@ -67,6 +67,17 @@ public sealed class DayTimeline : Control
     private readonly DrawingVisual stickyHeader = new();
     private double badgeY = double.NaN;
     public event Action? ViewportChanged;
+    internal int TodayNavigationDirection
+    {
+        get
+        {
+            var days = Days?.ToList() ?? [];
+            int index = days.FindIndex(d => CalendarTime.IndicatorMinutes(d.Date, CurrentTime, TimeZoneId) is not null);
+            if (index < 0 || days.Count == 0) return 1;
+            double left = TimeGutterWidth + index * (ActualWidth - TimeGutterWidth) / days.Count;
+            return left < (scrollOwner?.HorizontalOffset ?? 0) ? -1 : 1;
+        }
+    }
     public bool IsTodayColumnVisible
     {
         get

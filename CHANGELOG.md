@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Animate Show Today with the same directional carousel used by period navigation, including horizontally hidden day columns.
 - Use continuous frame-driven wheel scrolling that preserves velocity across repeated wheel input, with no delayed snapping or overshoot.
 - Skip duplicate rendering timestamps and reuse sticky-header transforms and clipping geometry during scrolling.
 - Stop scroll rendering callbacks when idle, hidden or unloaded, and respect Windows animation preferences.

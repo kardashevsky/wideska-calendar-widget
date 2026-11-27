@@ -122,6 +122,9 @@ internal static partial class Program
             Check(!timeline.IsTodayColumnVisible && todayButton.Visibility == Visibility.Visible,
                 "Show today must remain available when today's column is outside the horizontal viewport");
             todayButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, todayButton));
+            if (SystemParameters.ClientAreaAnimation)
+                Check(((Image)window.FindName("OutgoingCalendar")).Source is not null,
+                    "Revealing a horizontally hidden today column must use the same carousel transition");
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(timeline.IsTodayColumnVisible && todayButton.Visibility == Visibility.Collapsed,
                 "Show today must reveal the current column before hiding itself");

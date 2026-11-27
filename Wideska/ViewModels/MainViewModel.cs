@@ -148,6 +148,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
     public bool ShouldShowToday => IsYear ? !Months.Any(m => m.Days.Any(d => d.Today && d.InMonth)) : !Days.Any(d => d.Today);
+    internal int TodayNavigationDirection => CalendarTime.Local(currentTime, CalendarTimeZoneId).Date.CompareTo(anchor.Date);
     public string HeaderMonth => IsYear ? anchor.Year.ToString(AppLocalization.Culture) : AppLocalization.Culture.TextInfo.ToTitleCase(anchor.ToString("MMMM", AppLocalization.Culture));
     public string HeaderYear => IsYear ? "" : anchor.Year.ToString(AppLocalization.Culture);
     public string Period => View == CalendarView.Year ? anchor.ToString("yyyy") : AppLocalization.Culture.TextInfo.ToTitleCase(anchor.ToString("MMMM yyyy", AppLocalization.Culture));

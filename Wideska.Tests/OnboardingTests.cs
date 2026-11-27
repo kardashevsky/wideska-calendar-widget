@@ -155,6 +155,7 @@ internal static partial class Program
             Check(outgoing.Source is null && outgoing.Visibility == Visibility.Collapsed && Math.Abs(((TranslateTransform)calendarContent.RenderTransform).X) < .01 && Math.Abs(calendarContent.Opacity - 1) < .01,
                 "Rapid navigation must finish with a fully visible calendar and release transition snapshots");
         }
+        await TestTodayNavigationAsync(app, window);
         vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
