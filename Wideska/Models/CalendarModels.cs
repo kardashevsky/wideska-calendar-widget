@@ -16,7 +16,7 @@ public sealed class WidgetSettings
     public double Height { get; set; } = 560;
     public double BackgroundOpacity { get; set; } = 0.14;
     public bool DarkTheme { get; set; } = true;
-    public bool StartWithWindows { get; set; }
+    public bool StartWithWindows { get; set; } = true;
     public WindowBehavior Behavior { get; set; }
     public CalendarView View { get; set; } = CalendarView.Month;
     public int SyncMinutes { get; set; } = 1;
