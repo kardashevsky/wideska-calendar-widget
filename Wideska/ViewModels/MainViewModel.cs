@@ -52,7 +52,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly CancellationToken lifetimeToken;
     private CancellationTokenSource? saveDebounce;
     private readonly SemaphoreSlim syncGate = new(1, 1);
-    private Task? refreshLoop;
     private Task? shutdownTask;
     private Task? initializationTask;
     private bool disposed;
@@ -186,7 +185,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OpenEventCommand = new RelayCommand(value => { if (ShowWidget && value is EventItem item) { SettingsOpen = false; SelectedEvent = item; } });
         CloseEventCommand = new RelayCommand(_ => SelectedEvent = null);
         FitDesktopCommand = new RelayCommand(_ => { if (!GeometryLocked) FitDesktopRequested?.Invoke(); });
-        minuteTimer.Tick += (_, _) => { UpdateCurrentTime(DateTimeOffset.UtcNow); ScheduleMinute(); };
+        minuteTimer.Tick += OnMinuteTick;
         secondTimer.Tick += (_, _) => { clockTime = DateTimeOffset.UtcNow; Changed(nameof(ClockText)); AlignClockTick(); };
         PreviousCommand = new RelayCommand(_ => Navigate(-1));
         NextCommand = new RelayCommand(_ => Navigate(1));
@@ -269,7 +268,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ReindexEvents();
             ApplyCalendars(); Rebuild();
             await RefreshAsync();
-            refreshLoop = RefreshLoopAsync();
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { ReportError(ex); }
@@ -280,7 +278,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void ScheduleMinute()
     {
         if (lifetime.IsCancellationRequested) return;
-        minuteTimer.Interval = TimeSpan.FromMilliseconds(60000 - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 60000);
+        minuteTimer.Interval = DelayUntilNextMinute(DateTimeOffset.UtcNow);
         minuteTimer.Start();
     }
     public void UpdateCurrentTime(DateTimeOffset now)
@@ -309,17 +307,20 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         secondTimer.Interval = TimeSpan.FromMilliseconds(1000 - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1000);
         secondTimer.Start();
     }
-    private async Task RefreshLoopAsync()
+    internal static TimeSpan DelayUntilNextMinute(DateTimeOffset now) =>
+        TimeSpan.FromTicks(TimeSpan.TicksPerMinute - now.UtcTicks % TimeSpan.TicksPerMinute);
+    private async void OnMinuteTick(object? sender, EventArgs e)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(AutoSyncMinutes));
+        minuteTimer.Stop();
+        // Recompute from wall-clock time before waiting for I/O: no accumulated drift or overlapping requests.
+        ScheduleMinute();
         try
         {
-            while (await timer.WaitForNextTickAsync(lifetimeToken))
-            {
-                await RefreshAsync();
-            }
+            UpdateCurrentTime(DateTimeOffset.UtcNow);
+            await RefreshAsync();
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception ex) { ReportError(ex); }
     }
     public async Task RefreshAsync()
     {
@@ -487,7 +488,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         secondTimer.Stop();
         lifetime.Cancel();
         if (initializationTask is not null) await initializationTask;
-        if (refreshLoop is not null) await refreshLoop;
         await syncGate.WaitAsync();
         try { await SaveAsync(); }
         finally { syncGate.Release(); }
