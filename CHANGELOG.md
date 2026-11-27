@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep wheel bursts smooth when input arrives before WPF applies a queued animation frame; do not mistake that frame for manual scrollbar input.
 - Animate Show Today with the same directional carousel used by period navigation, including horizontally hidden day columns.
 - Use continuous frame-driven wheel scrolling that preserves velocity across repeated wheel input, with no delayed snapping or overshoot.
 - Skip duplicate rendering timestamps and reuse sticky-header transforms and clipping geometry during scrolling.
