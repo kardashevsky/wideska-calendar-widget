@@ -2,6 +2,12 @@
 
 An MIT-licensed Windows desktop calendar widget built with C#, .NET 10 and WPF. The application uses MVVM and has no third-party runtime packages.
 
+## Download
+
+Download the latest [Windows x64 executable](https://github.com/kardashevsky/wideska-calendar-widget/releases/latest/download/Wideska.exe) or browse [all releases](https://github.com/kardashevsky/wideska-calendar-widget/releases). The portable executable includes the .NET runtime. Follow [Google Calendar setup](GOOGLE_CALENDAR_SETUP.md) to connect your own account.
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 ## Features
 
 - Day, three consecutive days, Monday–Friday workweek, Monday–Sunday week, month and twelve-month year views. The year uses two rows of six months, grouped into labeled Q1–Q4 panels with three months each. Square date cells and proportional scaling keep month grids balanced. The annual grid fits the available area, stays centered and caps its width on wide widgets without changing its two-row structure.
@@ -32,21 +38,37 @@ dotnet build Wideska/Wideska.slnx -c Release --artifacts-path artifacts/build
 .\artifacts\build\bin\Wideska\release\Wideska.exe
 ```
 
-Synchronization status uses a fixed-height footer and appears only on hover or keyboard interaction. While synchronizing, a small spinner replaces the last-update text without changing calendar dimensions. The spinner stops when hidden; background synchronization does not announce each minute.
+Synchronization runs silently in the background without status text, progress indicators or layout changes.
 
 ## Widget heading
 
-The widget has no in-content logo or product name; the application icon remains in the tray and executable. The selected month and year form the large heading (year only in the annual view). Day view adds the selected weekday and date. The red current-time badge inside the day/week grid shows the calendar-local `HH:mm:ss` clock. A separate drawing layer updates only the badge each second while a time-grid view is visible; the minute-based timeline and Google synchronization remain separate. The interface uses graphite surfaces and cool blue accents in dark mode, with matching neutral light-mode colors. Google calendar colors are preserved.
+The widget has no in-content logo or product name; the application icon remains in the tray and executable. The selected month and year form a compact left-aligned heading (year only in the annual view). The date panel highlights the complete current-day header. The red current-time badge inside the day/week grid shows the calendar-local `HH:mm:ss` clock. A separate drawing layer updates only the badge each second while a time-grid view is visible; the minute-based timeline and Google synchronization remain separate. The interface uses graphite surfaces and cool blue accents in dark mode, with matching neutral light-mode colors. Google calendar colors are preserved.
 
 ## Time scale and desktop hosting
 
-Day, three-day, workweek and week views use a shared 24-hour grid. Only event cards use a hand cursor; empty time slots and labels use the standard arrow. Dates and all-day events remain pinned while the hourly grid scrolls below them, including their clickable event cards. In multi-day views the current calendar-local day has a subtle full-column accent. Timed events occupy their calendar-local slots and overlapping events use separate lanes. All-day events remain above the hourly grid. A red line and starting dot appear only in the current calendar-local day and render above events. A dispatcher timer updates the clock at minute boundaries without API calls or rebuilding the view. Opening a day/week view scrolls near the current time; later ticks preserve the chosen scroll position. Month and year views have no hourly scale and do not display the line.
+Day, three-day, workweek and week views use a shared 24-hour grid. Only event cards use a hand cursor; empty time slots and labels use the standard arrow. Dates and all-day events remain pinned while the hourly grid scrolls below them, including their clickable event cards. In multi-day views the current calendar-local day has a subtle full-column accent. Timed events occupy their calendar-local slots and overlapping events use wider, partially overlapping cards with staggered horizontal positions. All-day events remain above the hourly grid. A red line and starting dot appear only in the current calendar-local day and render above events. A dispatcher timer updates the clock at minute boundaries without API calls or rebuilding the view. Opening a day/week view scrolls near the current time; later ticks preserve the chosen scroll position. Month and year views have no hourly scale and do not display the line.
 
 Desktop integration uses Win32 `SetParent` with the existing `SHELLDLL_DefView` desktop view. This also accommodates the raised desktop composition used by recent Windows 11 versions. It does not use a periodically lowered top-level window or change Explorer styles. Authentication remains a separate presentation state in the existing window; its browser flow, scopes and token handling are unchanged. Explorer must be running for desktop hosting. The shell desktop class is an Explorer implementation detail: validate new Windows shell builds and restart Wideska if Explorer is restarted and destroys the hosted window.
 
 The executable declares Per-Monitor V2 awareness. Geometry uses native physical screen coordinates, while WPF content is adjusted for the monitor DPI because a child HWND otherwise inherits the desktop host DPI. Display/DPI changes re-evaluate scaling and recover windows on disconnected monitors. Mixed-DPI monitor layouts and Windows logon should also be checked on the target hardware.
 
+## Build the portable Windows executable
+
+```powershell
+dotnet publish Wideska/Wideska.csproj -p:PublishProfile=PortableWindows --disable-build-servers
+```
+
+The output is `artifacts/portable-win-x64/Wideska.exe`, a self-contained Windows x64 build. It includes the .NET runtime and does not bundle OAuth credentials. Distribute it together with [GOOGLE_CALENDAR_SETUP.md](GOOGLE_CALENDAR_SETUP.md).
+
+## Interface language
+
+The interface supports Russian and English. The default follows the Windows UI language, with English as the fallback for other languages. Choose System language, Русский or English in tray settings; the selection is saved and updates the interface without restarting. Calendar names and event content remain unchanged.
+
+Show today appears only when the current calendar-local date is absent from the displayed period or its day column is outside the horizontal viewport.
+
 ## Connect Google Calendar
+
+See [the step-by-step Google Calendar setup guide](GOOGLE_CALENDAR_SETUP.md) for connecting your own account and selecting calendars.
 
 The first launch shows only the connection screen. The calendar and any cached events remain hidden until the initial account check finishes. A saved valid session reconnects automatically on subsequent launches. Expired or revoked authorization returns to the connection screen. Disconnecting also hides the calendar and removes its cache.
 
@@ -71,7 +93,7 @@ References: [Google Desktop OAuth](https://developers.google.com/identity/protoc
 
 Settings, OAuth credentials and calendar cache are stored under `%LOCALAPPDATA%\Wideska` in separate `.bin` files. All three use Windows DPAPI bound to the current Windows user. Writes use temporary files and atomic replacement. Settings include the OAuth client configuration. No credentials or personal event data belong in Git.
 
-Calendar data goes only to the Google Calendar API. There is no application telemetry. The cache covers the displayed year plus the preceding December and following January; navigation into another year loads that range. API pagination is supported. Network failures retain the previous snapshot and indicate cached data in the status. Authentication failures hide the calendar and remove cached events until you sign in again. Calendar data is read-only; creating and editing events are outside this widget's requirements.
+Calendar data goes only to the Google Calendar API. There is no application telemetry. The cache covers the displayed year plus the preceding December and following January; navigation into another year loads that range. API pagination is supported. Network failures retain the previous snapshot. Authentication failures hide the calendar and remove cached events until you sign in again. Calendar data is read-only; creating and editing events are outside this widget's requirements.
 
 ## Verification
 
@@ -84,7 +106,7 @@ This standalone test executable has no test framework dependency. It exits nonze
 
 Manual acceptance checks on the target desktop: sign in to Google; compare recurring exceptions, all-day and cross-time-zone events with Google Calendar; hide/show calendars; disconnect; restart and check restored settings; verify tray actions, startup, multi-monitor movement and the preferred DPI settings. Live Google authorization, Windows logon startup and Explorer interactions require interactive verification.
 
-For an interactive shell check, run the test EXE with `--desktop-smoke`. It temporarily minimizes ordinary windows, checks desktop hosting and ToggleDesktop, saves a native screenshot of synthetic widget data, and restores the windows. Use the EXE so that the DPI and Windows compatibility manifest is active. Regular tests do not run Show Desktop. The suite also checks DST, calendar-zone midnight, minute updates without synchronization, overlap lanes, lock state and physical geometry across a fresh view-model instance.
+For an interactive shell check, run the test EXE with `--desktop-smoke`. It temporarily minimizes ordinary windows, checks desktop hosting and ToggleDesktop, saves a native screenshot of synthetic widget data, and restores the windows. Use the EXE so that the DPI and Windows compatibility manifest is active. Regular tests do not run Show Desktop. The suite also checks DST, calendar-zone midnight, minute updates without synchronization, overlap stacking and click targets, lock state and physical geometry across a fresh view-model instance.
 
 ## Structure
 
