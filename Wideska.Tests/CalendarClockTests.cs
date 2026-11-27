@@ -1,4 +1,4 @@
-﻿using Wideska.Models;
+using Wideska.Models;
 using Wideska.Providers;
 using Wideska.Services;
 using Wideska.ViewModels;
@@ -17,6 +17,14 @@ internal static partial class Program
             Check(vm.CalendarTimeZoneId == "Asia/Tokyo" && vm.Days[0].Date == new DateTime(2026,1,2), "Today must follow primary calendar time zone rather than Windows date");
             Check(vm.ClockText == "08:59:00" && vm.IsSingleDay && vm.DayHeading.Contains("2"), "Day heading and second-resolution clock must use the calendar time zone");
             var timed = vm.Days[0].Events.Single(e => !e.AllDay);
+            string originalLanguage = vm.Language;
+            foreach (string language in new[] { "en", "ru" })
+            {
+                vm.Language = language;
+                Check(vm.Days[0].Events.Single(e => !e.AllDay).Time == "08:00 \u2013 11:00",
+                    "Event time must use zero-padded 24-hour hours in both interface languages");
+            }
+            vm.Language = originalLanguage;
             Check(timed.StartMinute == 480 && timed.EndMinute == 660, "Event geometry must use the same calendar-local time as the current marker");
             Check(vm.Days[0].Events.Any(e => e.AllDay), "All-day dates must not shift when the display time zone changes");
             var day = vm.Days[0]; int requests = provider.Requests;

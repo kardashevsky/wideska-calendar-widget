@@ -53,7 +53,6 @@ public sealed class DayTimeline : Control
     private bool scrollPending;
     private string? positionedDateRange;
     private bool automaticScrollComplete;
-    private readonly System.Windows.Threading.DispatcherTimer scrollSnapTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private readonly DrawingVisual timeBadge = new();
     private readonly DrawingVisual stickyHeader = new();
     private double badgeY = double.NaN;
@@ -93,19 +92,6 @@ public sealed class DayTimeline : Control
         AddVisualChild(timeBadge);
         AddVisualChild(stickyHeader);
         MinHeight = MinimumTimelineHeight;
-        scrollSnapTimer.Tick += (_, _) =>
-        {
-            scrollSnapTimer.Stop();
-            if (scrollOwner is null || !IsVisible || Mouse.LeftButton == MouseButtonState.Pressed) return;
-            scrollOwner.ScrollToVerticalOffset(SnappedScrollOffset(scrollOwner.VerticalOffset, scrollOwner.ScrollableHeight));
-        };
-        PreviewMouseWheel += (_, e) =>
-        {
-            if (e.Delta == 0) return;
-            scrollSnapTimer.Stop();
-            scrollSnapTimer.Start();
-        };
-        Unloaded += (_, _) => scrollSnapTimer.Stop();
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         Loaded += (_, _) => { Observe(); ConnectScrollOwner(); ScheduleScroll(); };
         IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
@@ -144,13 +130,6 @@ public sealed class DayTimeline : Control
         return hits.LastOrDefault(h => h.Bounds.Contains(position));
     }
     public EventItem? EventAt(Point position) => ItemAt(position).Event;
-    public double SnappedScrollOffset(double offset, double maximum)
-    {
-        double timelineHeight = ActualHeight - headerHeight - TimelineBottomPadding;
-        if (timelineHeight <= 0) return Math.Clamp(offset, 0, Math.Max(0, maximum));
-        double halfHourHeight = timelineHeight / 48;
-        return Math.Clamp(Math.Round(offset / halfHourHeight, MidpointRounding.AwayFromZero) * halfHourHeight, 0, Math.Max(0, maximum));
-    }
     private void ConnectScrollOwner()
     {
         if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged;
