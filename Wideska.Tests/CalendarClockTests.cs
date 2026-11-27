@@ -25,6 +25,14 @@ internal static partial class Program
                     "Event time must use zero-padded 24-hour hours in both interface languages");
             }
             vm.Language = originalLanguage;
+            foreach (var view in new[] { CalendarView.Week, CalendarView.Month, CalendarView.Year })
+            {
+                vm.View = view;
+                var cells = view == CalendarView.Year ? vm.Months.SelectMany(m => m.Days) : vm.Days;
+                Check(cells.All(d => d.IsPast == (d.Date < new DateTime(2026, 1, 2))),
+                    "Past days must use the calendar date in every view, including when UTC is still yesterday");
+            }
+            vm.View = CalendarView.SingleDay;
             Check(timed.StartMinute == 480 && timed.EndMinute == 660, "Event geometry must use the same calendar-local time as the current marker");
             Check(vm.Days[0].Events.Any(e => e.AllDay), "All-day dates must not shift when the display time zone changes");
             var day = vm.Days[0]; int requests = provider.Requests;
