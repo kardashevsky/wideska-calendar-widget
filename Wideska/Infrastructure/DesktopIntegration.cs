@@ -25,6 +25,8 @@ public sealed class DesktopIntegration : IDisposable
     private readonly MenuItem lockItem;
     private readonly MenuItem fitItem;
     private bool geometryLocked;
+    private bool isDesktopFilled;
+    public bool IsDesktopFilled { get => isDesktopFilled; set { isDesktopFilled = value; fitItem.Header = value ? "Restore widget size" : "Fill desktop work area"; } }
     public bool GeometryLocked
     {
         get => geometryLocked;
@@ -102,7 +104,7 @@ public sealed class DesktopIntegration : IDisposable
     {
         if (Host.IsAttached)
         {
-            if (GeometryLocked) return;
+            if (GeometryLocked || IsDesktopFilled) return;
             var b = Host.GetBounds(); var desktopArea = Host.WorkArea();
             Host.SetBounds(b with { X = desktopArea.X + Math.Max(0, (desktopArea.Width - b.Width) / 2), Y = desktopArea.Y + Math.Max(0, (desktopArea.Height - b.Height) / 2) });
             return;

@@ -26,6 +26,8 @@ internal static partial class Program
             Check(vm.Days[0].Date == new DateTime(2026,1,3) && vm.Days[0].Events.Count == 0, "Calendar-zone midnight must advance today and preserve exclusive event ends");
             vm.GeometryLocked = true;
             vm.Settings.DesktopPlacement = new ScreenPlacement(-1600,80,1200,900);
+            vm.IsDesktopFilled = true;
+            vm.Settings.RestorePlacement = new ScreenPlacement(-1200,100,720,560);
             await vm.ShutdownAsync();
         }
         using (var restored = new MainViewModel(store,new ClockProvider()))
@@ -33,6 +35,7 @@ internal static partial class Program
             await restored.InitializeAsync();
             Check(restored.GeometryLocked && restored.Settings.DesktopPlacement == new ScreenPlacement(-1600,80,1200,900), "Restart must restore lock state and physical multi-monitor geometry");
             Check(restored.TimeZoneCalendarId == "tokyo", "Restart must restore the chosen calendar time zone");
+            Check(restored.IsDesktopFilled && restored.Settings.RestorePlacement == new ScreenPlacement(-1200,100,720,560), "Restart must retain desktop-fill mode and the prior windowed bounds");
             await restored.ShutdownAsync();
         }
     }

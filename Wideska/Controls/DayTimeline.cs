@@ -15,6 +15,8 @@ public sealed class DayTimeline : Control
     public static readonly DependencyProperty CurrentTimeProperty = DependencyProperty.Register(nameof(CurrentTime), typeof(DateTimeOffset), typeof(DayTimeline), new FrameworkPropertyMetadata(default(DateTimeOffset), FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty TimeZoneIdProperty = DependencyProperty.Register(nameof(TimeZoneId), typeof(string), typeof(DayTimeline), new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty GridBrushProperty = DependencyProperty.Register(nameof(GridBrush), typeof(Brush), typeof(DayTimeline), new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.AffectsRender));
+    public static readonly DependencyProperty EventCommandProperty = DependencyProperty.Register(nameof(EventCommand), typeof(ICommand), typeof(DayTimeline));
+    public ICommand? EventCommand { get => (ICommand?)GetValue(EventCommandProperty); set => SetValue(EventCommandProperty, value); }
     public static readonly DependencyProperty SurfaceBrushProperty = ThemeBrush(nameof(SurfaceBrush), "#ED1D2730");
     public static readonly DependencyProperty MutedBrushProperty = ThemeBrush(nameof(MutedBrush), "#BBCAD5");
     public static readonly DependencyProperty AxisBrushProperty = ThemeBrush(nameof(AxisBrush), "#8098ACBA");
@@ -36,7 +38,7 @@ public sealed class DayTimeline : Control
     public DateTimeOffset CurrentTime { get => (DateTimeOffset)GetValue(CurrentTimeProperty); set => SetValue(CurrentTimeProperty, value); }
     public string TimeZoneId { get => (string)GetValue(TimeZoneIdProperty); set => SetValue(TimeZoneIdProperty, value); }
     public Brush GridBrush { get => (Brush)GetValue(GridBrushProperty); set => SetValue(GridBrushProperty, value); }
-    private readonly List<(Rect Bounds, string Details)> hits = [];
+    private readonly List<(Rect Bounds, string Details, EventItem? Event)> hits = [];
     private INotifyCollectionChanged? observed;
     private string? hover;
     private readonly ToolTip eventToolTip = new();
@@ -65,6 +67,15 @@ public sealed class DayTimeline : Control
         if (hover is not null) InvalidateVisual();
         eventToolTip.IsOpen = false; eventToolTip.Content = null;
         ToolTip = null; hover = null;
+    }
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        var item = hits.LastOrDefault(h => h.Bounds.Contains(e.GetPosition(this))).Event;
+        if (item is not null && EventCommand?.CanExecute(item) == true)
+        {
+            ClearHover(); EventCommand.Execute(item); e.Handled = true;
+        }
+        base.OnMouseLeftButtonUp(e);
     }
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((DayTimeline)d).Observe();
     private void Observe()
@@ -146,7 +157,7 @@ public sealed class DayTimeline : Control
         for (int index = 0; index < days.Count; index++)
         {
             var day = days[index]; double x = TimeGutterWidth + index * column;
-            hits.Add((new Rect(x, 0, column, startY), day.Summary));
+            hits.Add((new Rect(x, 0, column, startY), day.Summary, null));
             if (index == today)
             {
                 dc.PushOpacity(.1); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 6, 4, Math.Max(1, column - 12), 34), 10, 10); dc.Pop();
@@ -217,6 +228,6 @@ public sealed class DayTimeline : Control
                 Text(dc, item.Title, rect.X + badgeWidth + 17, rect.Y + 4, rect.Width - badgeWidth - 24, 11, Foreground, FontWeights.Medium);
             }
         }
-        dc.Pop(); hits.Add((rect, item.Details));
+        dc.Pop(); hits.Add((rect, item.Details, item));
     }
 }

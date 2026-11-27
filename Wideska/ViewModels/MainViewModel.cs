@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows;
 using Wideska.Infrastructure;
 using Wideska.Models;
 using Wideska.Providers;
@@ -14,7 +15,12 @@ public sealed class CalendarSelection(CalendarInfo calendar, bool visible, Actio
     private bool visible = visible;
     public bool Visible { get => visible; set { if (Set(ref visible, value)) changed(); } }
 }
-public sealed record EventItem(string Title, string Time, string Color, string Details, bool AllDay = false, double StartMinute = 0, double EndMinute = 0);
+public sealed record EventItem(string Title, string Time, string Color, string Details, bool AllDay = false, double StartMinute = 0, double EndMinute = 0,
+    string Description = "", string Location = "", string CalendarName = "", string DateLabel = "", string TimeZoneLabel = "")
+{
+    public bool HasLocation => !string.IsNullOrWhiteSpace(Location);
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
+}
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
     public string Label => Date.ToString("ddd, d", CultureInfo.CurrentCulture);
@@ -53,8 +59,28 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string CalendarTimeZoneId => (snapshot.Calendars.FirstOrDefault(c => c.Id == Settings.TimeZoneCalendarId) ?? snapshot.Calendars.FirstOrDefault(c => c.IsPrimary) ?? snapshot.Calendars.FirstOrDefault())?.TimeZoneId ?? "";
     public string CalendarTimeZoneLabel => CalendarTime.Resolve(CalendarTimeZoneId).DisplayName;
     public string TimeZoneCalendarId { get => Settings.TimeZoneCalendarId; set { Settings.TimeZoneCalendarId = value; Changed(); UpdateTimeZone(); _ = SaveSafelyAsync(); } }
-    public bool GeometryLocked { get => Settings.GeometryLocked; set { Settings.GeometryLocked = value; Changed(); Changed(nameof(CanEditGeometry)); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
+    public bool GeometryLocked { get => Settings.GeometryLocked; set { Settings.GeometryLocked = value; Changed(); Changed(nameof(CanEditGeometry)); Changed(nameof(CanMoveWidget)); AppearanceChanged?.Invoke(); _ = SaveSafelyAsync(); } }
     public bool CanEditGeometry => ShowWidget && !GeometryLocked;
+    public bool CanMoveWidget => CanEditGeometry && !IsDesktopFilled;
+    public bool IsDesktopFilled
+    {
+        get => Settings.IsDesktopFilled;
+        set
+        {
+            if (Settings.IsDesktopFilled == value) return;
+            Settings.IsDesktopFilled = value;
+            Changed(); Changed(nameof(CanMoveWidget)); Changed(nameof(WidgetCornerRadius)); Changed(nameof(DesktopSizeActionLabel));
+            AppearanceChanged?.Invoke(); _ = SaveSafelyAsync();
+        }
+    }
+    public CornerRadius WidgetCornerRadius => new(IsDesktopFilled ? 0 : 24);
+    public string DesktopSizeActionLabel => IsDesktopFilled ? "Restore widget size" : "Fill desktop work area";
+    private EventItem? selectedEvent;
+    public EventItem? SelectedEvent { get => selectedEvent; private set { if (Set(ref selectedEvent, value)) { Changed(nameof(IsEventOpen)); Changed(nameof(IsCalendarEnabled)); } } }
+    public bool IsEventOpen => SelectedEvent is not null;
+    public bool IsCalendarEnabled => !IsEventOpen;
+    public ICommand OpenEventCommand { get; }
+    public ICommand CloseEventCommand { get; }
     public event Action? FitDesktopRequested;
     public ICommand FitDesktopCommand { get; }
     private CalendarSnapshot snapshot = new([], [], default);
@@ -92,12 +118,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         Changed(nameof(ShowWidget)); Changed(nameof(ShowAuthorization));
         Changed(nameof(CanEditGeometry));
+        Changed(nameof(CanMoveWidget));
         UpdateClockSchedule();
         AppearanceChanged?.Invoke();
     }
     public string ConnectionLabel => Connected ? "Google Calendar connected" : "No account connected";
     private bool settingsOpen;
-    public bool SettingsOpen { get => settingsOpen; set => Set(ref settingsOpen, value); }
+    public bool SettingsOpen { get => settingsOpen; set { Set(ref settingsOpen, value); if (value) SelectedEvent = null; } }
     public string Period => View == CalendarView.Year ? anchor.ToString("yyyy") : CultureInfo.CurrentCulture.TextInfo.ToTitleCase(anchor.ToString("MMMM yyyy"));
     public bool IsYear => View == CalendarView.Year;
     public bool IsMonth => View == CalendarView.Month;
@@ -128,6 +155,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(LocalStore store, ICalendarProvider provider)
     {
         this.store = store; this.provider = provider;
+        OpenEventCommand = new RelayCommand(value => { if (ShowWidget && value is EventItem item) { SettingsOpen = false; SelectedEvent = item; } });
+        CloseEventCommand = new RelayCommand(_ => SelectedEvent = null);
         FitDesktopCommand = new RelayCommand(_ => { if (!GeometryLocked) FitDesktopRequested?.Invoke(); });
         minuteTimer.Tick += (_, _) => { UpdateCurrentTime(DateTimeOffset.UtcNow); ScheduleMinute(); };
         secondTimer.Tick += (_, _) => { clockTime = DateTimeOffset.UtcNow; Changed(nameof(ClockText)); AlignClockTick(); };
@@ -142,7 +171,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             Busy = true;
             try
             {
-                SettingsOpen = false; Connected = false;
+                SelectedEvent = null; SettingsOpen = false; Connected = false;
                 snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); Rebuild();
                 Status = "Disconnecting Google account…";
                 await store.DeleteAsync("calendar-cache.bin");
@@ -269,7 +298,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (CalendarAuthorizationException ex)
         {
-            SettingsOpen = false; Connected = false;
+            SelectedEvent = null; SettingsOpen = false; Connected = false;
             snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); Rebuild();
             await store.DeleteAsync("calendar-cache.bin");
             Status = ex.Message;
@@ -311,8 +340,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 double startMinute = start.Date < day ? 0 : start.TimeOfDay.TotalMinutes;
                 double endMinute = end.Date > day ? 1440 : end.TimeOfDay.TotalMinutes;
                 if (!e.AllDay && endMinute <= startMinute && e.End > e.Start) endMinute = Math.Min(1440, startMinute + (e.End - e.Start).TotalMinutes);
-                return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{e.Description}".Trim(), e.AllDay,
-                    startMinute, endMinute);
+                string description = EventText.ToPlainText(e.Description);
+                DateTime first = e.AllDay ? e.Start.Date : start.Date;
+                DateTime last = e.AllDay ? e.End.Date.AddDays(-1) : end.Date;
+                string dateLabel = first == last ? first.ToString("D") : $"{first:D} – {last:D}";
+                return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{description}".Trim(), e.AllDay,
+                    startMinute, endMinute, description, e.Location, snapshot.Calendars.FirstOrDefault(c => c.Id == e.CalendarId)?.Name ?? "", dateLabel, CalendarTimeZoneLabel);
             }).ToList();
         return new(day, day.Month == month, day == CalendarTime.Local(currentTime, CalendarTimeZoneId).Date, events);
     }
