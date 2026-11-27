@@ -2,11 +2,9 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Wideska.Services;
-using Wideska.Infrastructure;
 using Wideska.ViewModels;
 
 namespace Wideska.Controls;
@@ -49,15 +47,6 @@ public sealed class DayTimeline : Control
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> hits = [];
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> headerHits = [];
     private ScrollViewer? scrollOwner;
-    private ScrollContentPresenter? scrollPresenter;
-    private const double WheelDistance = 72;
-    private readonly System.Diagnostics.Stopwatch scrollAnimationClock = new();
-    private readonly ScrollMotion scrollMotion = new();
-    private double lastScrollFrameSeconds;
-    private TimeSpan? lastRenderingTime;
-    private double scrollTargetOffset;
-    private int wheelDirection;
-    internal bool IsScrollAnimating => scrollAnimationClock.IsRunning;
     private double headerHeight;
     private bool drawingHeader;
     private INotifyCollectionChanged? observed;
@@ -97,7 +86,6 @@ public sealed class DayTimeline : Control
     }
     public void RevealToday()
     {
-        StopScrollAnimation();
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
         {
             if (!IsVisible || scrollOwner is null) return;
@@ -117,42 +105,13 @@ public sealed class DayTimeline : Control
         AddVisualChild(timeBadge);
         AddVisualChild(stickyHeader);
         MinHeight = MinimumTimelineHeight;
-        PreviewMouseWheel += (_, e) =>
-        {
-            if (scrollOwner is null || e.Delta == 0 || headerHeight <= 0) return;
-            int direction = Math.Sign(e.Delta);
-            double offset = IsScrollAnimating && wheelDirection == direction ? scrollTargetOffset : scrollOwner.VerticalOffset;
-            scrollTargetOffset = Math.Clamp(offset - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * WheelDistance,
-                0, scrollOwner.ScrollableHeight);
-            if (!IsScrollAnimating || wheelDirection != direction) scrollMotion.Reset(scrollOwner.VerticalOffset);
-            scrollMotion.Retarget(scrollTargetOffset);
-            wheelDirection = direction;
-            if (!SystemParameters.ClientAreaAnimation)
-            {
-                StopScrollAnimation();
-                scrollOwner.ScrollToVerticalOffset(scrollTargetOffset);
-            }
-            else
-            {
-                if (!IsScrollAnimating)
-                {
-                    lastScrollFrameSeconds = 0;
-                    lastRenderingTime = null;
-                    CompositionTarget.Rendering += OnScrollFrame;
-                    scrollAnimationClock.Restart();
-                }
-            }
-            e.Handled = true;
-        };
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         Loaded += (_, _) => { Observe(); ConnectScrollOwner(); ScheduleScroll(); };
-        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else { StopScrollAnimation(); ClearHover(); } };
-        Unloaded += (_, _) => { StopScrollAnimation(); ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; DisconnectScrollOwner(); };
-        PreviewMouseLeftButtonDown += (_, _) => StopScrollAnimation();
+        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
+        Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; DisconnectScrollOwner(); };
         MouseLeave += (_, _) => { Cursor = Cursors.Arrow; ClearHover(); };
         MouseMove += (_, e) =>
         {
-            if (IsScrollAnimating) { Cursor = Cursors.Arrow; ClearHover(); return; }
             var hit = ItemAt(e.GetPosition(this));
             Cursor = hit.Event is not null ? Cursors.Hand : Cursors.Arrow;
             string? details = hit.Details;
@@ -166,29 +125,6 @@ public sealed class DayTimeline : Control
         if (hover is not null) InvalidateVisual();
         eventToolTip.IsOpen = false; eventToolTip.Content = null;
         ToolTip = null; hover = null;
-    }
-    private void StopScrollAnimation()
-    {
-        CompositionTarget.Rendering -= OnScrollFrame;
-        scrollAnimationClock.Reset();
-    }
-    private void OnScrollFrame(object? sender, EventArgs e)
-    {
-        if (scrollOwner is null || !IsVisible) { StopScrollAnimation(); return; }
-        if (e is RenderingEventArgs rendering)
-        {
-            if (lastRenderingTime == rendering.RenderingTime) return;
-            lastRenderingTime = rendering.RenderingTime;
-        }
-        double now = scrollAnimationClock.Elapsed.TotalSeconds;
-        scrollMotion.Advance(now - lastScrollFrameSeconds);
-        lastScrollFrameSeconds = now;
-        bool settled = scrollMotion.IsSettled;
-        double offset = Math.Clamp(settled ? scrollTargetOffset : scrollMotion.Position, 0, scrollOwner.ScrollableHeight);
-        // Update the physical scroll presenter directly instead of queuing a ScrollViewer command every frame.
-        if (scrollPresenter is IScrollInfo scrollInfo) scrollInfo.SetVerticalOffset(offset);
-        else scrollOwner.ScrollToVerticalOffset(offset);
-        if (settled) StopScrollAnimation();
     }
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
@@ -209,45 +145,23 @@ public sealed class DayTimeline : Control
     public EventItem? EventAt(Point position) => ItemAt(position).Event;
     private void ConnectScrollOwner()
     {
-        StopScrollAnimation();
         DisconnectScrollOwner();
         DependencyObject? parent = VisualTreeHelper.GetParent(this);
         while (parent is not null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
         scrollOwner = parent as ScrollViewer;
-        if (scrollOwner is not null)
-        {
-            scrollPresenter = scrollOwner.Template.FindName("PART_ScrollContentPresenter", scrollOwner) as ScrollContentPresenter;
-            scrollOwner.ScrollChanged += OnScrollChanged;
-            scrollOwner.AddHandler(ScrollBar.ScrollEvent, new ScrollEventHandler(OnScrollBarInput), true);
-            scrollOwner.AddHandler(PreviewMouseDownEvent, new MouseButtonEventHandler(OnScrollPointerInput), true);
-            scrollOwner.AddHandler(PreviewKeyDownEvent, new KeyEventHandler(OnScrollKeyInput), true);
-        }
+        if (scrollOwner is not null) scrollOwner.ScrollChanged += OnScrollChanged;
         UpdateHeaderPosition();
     }
     private void DisconnectScrollOwner()
     {
-        if (scrollOwner is not null)
-        {
-            scrollOwner.ScrollChanged -= OnScrollChanged;
-            scrollOwner.RemoveHandler(ScrollBar.ScrollEvent, new ScrollEventHandler(OnScrollBarInput));
-            scrollOwner.RemoveHandler(PreviewMouseDownEvent, new MouseButtonEventHandler(OnScrollPointerInput));
-            scrollOwner.RemoveHandler(PreviewKeyDownEvent, new KeyEventHandler(OnScrollKeyInput));
-        }
+        if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged;
         scrollOwner = null;
-        scrollPresenter = null;
-    }
-    private void OnScrollBarInput(object sender, ScrollEventArgs e) => StopScrollAnimation();
-    private void OnScrollPointerInput(object sender, MouseButtonEventArgs e) => StopScrollAnimation();
-    private void OnScrollKeyInput(object sender, KeyEventArgs e)
-    {
-        if (e.Key is Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End) StopScrollAnimation();
     }
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (e.ViewportHeightChange != 0 || e.ExtentHeightChange != 0) StopScrollAnimation();
         if (e.VerticalChange == 0 && e.HorizontalChange == 0 && e.ViewportHeightChange == 0 && e.ViewportWidthChange == 0) return;
         ClearHover(); UpdateHeaderPosition(e.HorizontalChange != 0 || e.ViewportWidthChange != 0);
-        if (IsMouseOver) Cursor = !IsScrollAnimating && ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
+        if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
     }
     private void UpdateHeaderPosition(bool notifyViewport = true)
     {
@@ -269,7 +183,6 @@ public sealed class DayTimeline : Control
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var timeline = (DayTimeline)d;
-        timeline.StopScrollAnimation();
         timeline.Observe();
     }
     private void Observe()

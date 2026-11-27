@@ -3,13 +3,8 @@
 ## Unreleased
 
 - Dim past calendar days and their events without blocking interaction; use the selected calendar time zone and preserve today's highlighting.
-- Apply animated offsets directly through the physical scroll presenter instead of queuing a command per frame.
-- Cancel wheel animation on actual scrollbar, pointer or keyboard input rather than guessing from delayed offset notifications; detach all input handlers on unload.
-- Keep wheel bursts smooth when input arrives before WPF applies a queued animation frame; do not mistake that frame for manual scrollbar input.
+- Restore native WPF wheel and scrollbar behavior; remove custom scroll animation, inertia and slot snapping.
 - Animate Show Today with the same directional carousel used by period navigation, including horizontally hidden day columns.
-- Use continuous frame-driven wheel scrolling that preserves velocity across repeated wheel input, with no delayed snapping or overshoot.
-- Skip duplicate rendering timestamps and reuse sticky-header transforms and clipping geometry during scrolling.
-- Stop scroll rendering callbacks when idle, hidden or unloaded, and respect Windows animation preferences.
 - Use zero-padded 24-hour event times in both interface languages.
 - Remove delayed half-hour snapping that caused a second movement after wheel scrolling.
 

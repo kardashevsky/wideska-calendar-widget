@@ -37,7 +37,6 @@ internal static partial class Program
     private static async Task RunAsync(Application app)
     {
         TestMinuteBoundary();
-        TestScrollMotion();
         TestPastDayRendering();
         string linkedDescription = EventText.ToPlainText("Join <a href='https://example.com/meet?a=1&amp;b=2'>meeting</a>");
         Check(linkedDescription.Contains("https://example.com/meet?a=1&b=2"), "HTML descriptions must preserve link destinations and decode query parameters");
