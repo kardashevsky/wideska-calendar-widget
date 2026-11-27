@@ -25,6 +25,7 @@ public sealed record EventItem(string Title, string Time, string Color, string D
 }
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
+    public bool IsPast { get; init; }
     public string Label => $"{Date.ToString("ddd", AppLocalization.Culture).ToUpper(AppLocalization.Culture)}, {Date.Day}";
     public string FullLabel => $"{Date.ToString("ddd", AppLocalization.Culture).ToUpper(AppLocalization.Culture)}, {AppLocalization.Culture.TextInfo.ToTitleCase(Date.ToString("d MMMM", AppLocalization.Culture))}";
     public bool IsWeekend => Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
@@ -412,7 +413,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{preview}".Trim(), e.AllDay,
                     startMinute, endMinute, description, e.Location, snapshot.Calendars.FirstOrDefault(c => c.Id == e.CalendarId)?.Name ?? "", dateLabel, CalendarTimeZoneLabel, e.Id, e.CalendarId);
             }).ToList();
-        return new(day, day.Month == month, day == CalendarTime.Local(currentTime, CalendarTimeZoneId).Date, events);
+        var today = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
+        return new(day, day.Month == month, day == today, events) { IsPast = day.Date < today };
     }
     private void ReindexEvents()
     {

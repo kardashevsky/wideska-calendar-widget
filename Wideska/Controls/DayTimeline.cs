@@ -26,6 +26,8 @@ public sealed class DayTimeline : Control
     public static readonly DependencyProperty AxisBrushProperty = ThemeBrush(nameof(AxisBrush), "#8098ACBA");
     public static readonly DependencyProperty AccentBrushProperty = ThemeBrush(nameof(AccentBrush), "#8DD3EF");
     public static readonly DependencyProperty TodayHeaderBrushProperty = ThemeBrush(nameof(TodayHeaderBrush), "#155E75");
+    public static readonly DependencyProperty PastDayShadeProperty = ThemeBrush(nameof(PastDayShade), "#38000000");
+    public Brush PastDayShade { get => (Brush)GetValue(PastDayShadeProperty); set => SetValue(PastDayShadeProperty, value); }
     public Brush TodayHeaderBrush { get => (Brush)GetValue(TodayHeaderBrushProperty); set => SetValue(TodayHeaderBrushProperty, value); }
     public static readonly DependencyProperty NowBrushProperty = ThemeBrush(nameof(NowBrush), "#FF304F");
     public static readonly DependencyProperty WeekendBrushProperty = ThemeBrush(nameof(WeekendBrush), "#FDA4AF");
@@ -380,6 +382,8 @@ public sealed class DayTimeline : Control
                 var rect = new Rect(x + inset + item.HorizontalOffset * availableWidth, top + 2, Math.Max(1, availableWidth * item.WidthFraction - 2), Math.Max(2, bottom - top - 6));
                 Event(dc, item.Event, rect, true);
             }
+            if (day.IsPast)
+                dc.DrawRectangle(PastDayShade, null, new Rect(x, startY, column, ActualHeight - startY));
         }
         // The live-time badge and line remain visually distinct from event-start accents.
         if (today >= 0 && nowMinutes is not null)
@@ -424,6 +428,7 @@ public sealed class DayTimeline : Control
                 foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))
                     Event(dc, item, new Rect(x + (index == 0 ? 2 : 8), DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - (index == 0 ? 10 : 16)), 22), false);
                 if (day.Events.Count(e => e.AllDay) > allDayRows) Text(dc, AppLocalization.Text("More all-day events"), x + 12, headerHeight - 14, column - 24, 9, MutedBrush);
+                if (day.IsPast) dc.DrawRectangle(PastDayShade, null, new Rect(x, 0, column, headerHeight));
             }
         }
         finally { drawingHeader = false; }

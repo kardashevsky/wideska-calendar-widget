@@ -102,6 +102,8 @@ internal static partial class Program
         Check(window.AllowsTransparency && window.Opacity == 1 && !window.ShowInTaskbar, "Layered widget must preserve text opacity and stay out of the taskbar");
         vm.BackgroundOpacity = 0;
         Check(((SolidColorBrush)app.Resources["WidgetGlass"]).Color.A == 0 && window.Opacity == 1, "Zero tint must make the background fully transparent without fading text");
+        // Measure the glass independently of calendar content, including intentional past-day shading.
+        calendarContent.Visibility = Visibility.Hidden;
         window.UpdateLayout();
         var alphaProbe = new RenderTargetBitmap(720, 560, 96, 96, PixelFormats.Pbgra32);
         alphaProbe.Render(window);
@@ -114,6 +116,7 @@ internal static partial class Program
         alphaProbe.Clear(); alphaProbe.Render(window);
         alphaProbe.CopyPixels(new Int32Rect(10, 280, 1, 1), pixel, 4, 0);
         Check(pixel[3] is > 0 and < 255, "Rendered default glass must actually contain translucent pixels");
+        calendarContent.Visibility = Visibility.Visible;
         var grip = (System.Windows.Controls.Primitives.Thumb)window.FindName("ResizeGrip");
         grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(40, 20) { RoutedEvent = System.Windows.Controls.Primitives.Thumb.DragDeltaEvent });
         Check(window.Width == 760 && window.Height == 580, "Corner grip must resize a transparent frameless window");

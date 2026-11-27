@@ -219,6 +219,7 @@ public partial class MainWindow : Window
                 ["TimelineGrid"] = dark ? "#38BBCAD5" : "#38607586",
                 ["TimelineNow"] = "#FF304F",
                 ["TimelineTodayHeader"] = dark ? "#155E75" : "#C5F1FA",
+                ["PastDayShade"] = dark ? "#38000000" : "#20000000",
                 ["Weekend"] = dark ? "#FDA4AF" : "#BE123C"
             };
             foreach (var pair in colors) Application.Current.Resources[pair.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));

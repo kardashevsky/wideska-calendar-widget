@@ -38,6 +38,7 @@ internal static partial class Program
     {
         TestMinuteBoundary();
         TestScrollMotion();
+        TestPastDayRendering();
         string linkedDescription = EventText.ToPlainText("Join <a href='https://example.com/meet?a=1&amp;b=2'>meeting</a>");
         Check(linkedDescription.Contains("https://example.com/meet?a=1&b=2"), "HTML descriptions must preserve link destinations and decode query parameters");
         var linkText = new Wideska.Controls.LinkTextBlock { ContentText = linkedDescription + " www.example.org. https://example.com/page)." };
