@@ -18,6 +18,7 @@ internal static partial class Program
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         double afterTop = header.TransformToAncestor(window).Transform(new Point()).Y;
         Check(viewer.VerticalOffset > 0 && Math.Abs(afterTop - initialTop) < .5, "Day/date and all-day header must stay at the same screen position while hours scroll");
+        Check(timeline.Clip is RectangleGeometry viewportClip && Math.Abs(viewportClip.Rect.Top - viewer.VerticalOffset) < .5 && Math.Abs(viewportClip.Rect.Height - viewer.ViewportHeight) < .5, "Timeline visuals must be clipped to the viewport so scrolled events cannot leak above the header");
         double headerHeight = header.ContentBounds.Height;
         var allDay = timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, viewer.VerticalOffset + 48));
         Check(allDay?.AllDay == true, "Pinned all-day cards must retain their event hit targets after scrolling");
