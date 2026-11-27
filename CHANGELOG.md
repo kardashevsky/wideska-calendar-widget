@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Use zero-padded 24-hour event times in both interface languages.
+- Remove delayed half-hour snapping that caused a second movement after wheel scrolling.
+
 ## 0.1.1
 
 - Enable Windows sign-in startup by default for new installations; existing explicit preferences remain configurable.

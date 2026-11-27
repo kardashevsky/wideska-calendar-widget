@@ -398,7 +398,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             {
                 var start = CalendarTime.Local(e.Start, CalendarTimeZoneId);
                 var end = CalendarTime.Local(e.End, CalendarTimeZoneId);
-                string time = e.AllDay ? AppLocalization.Text("All day") : $"{start.ToString("t", AppLocalization.Culture)} – {end.ToString("t", AppLocalization.Culture)}";
+                string time = e.AllDay ? AppLocalization.Text("All day") : $"{start.ToString("HH:mm", CultureInfo.InvariantCulture)} – {end.ToString("HH:mm", CultureInfo.InvariantCulture)}";
                 double startMinute = start.Date < day ? 0 : start.TimeOfDay.TotalMinutes;
                 double endMinute = end.Date > day ? 1440 : end.TimeOfDay.TotalMinutes;
                 if (!e.AllDay && endMinute <= startMinute && e.End > e.Start) endMinute = Math.Min(1440, startMinute + (e.End - e.Start).TotalMinutes);
