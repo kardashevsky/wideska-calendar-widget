@@ -130,6 +130,10 @@ internal static partial class Program
         vm.View = CalendarView.SingleDay;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         SavePreview(window, "day-heading", true);
+        await TestStickyHeaderAsync(app, window);
+        vm.View = CalendarView.ThreeDays;
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        SavePreview(window, "three-days-today", true);
         vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
