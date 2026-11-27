@@ -174,6 +174,7 @@ internal static partial class Program
         public bool Connected { get; set; } = true;
         public bool FailAuthorization { get; set; }
         public bool SessionExpired { get; set; }
+        public int DelayMilliseconds { get; set; }
         public Task<bool> IsConnectedAsync(CancellationToken token) => Task.FromResult(Connected);
         public Task ConnectAsync(string id, string secret, CancellationToken token)
         {
@@ -181,16 +182,17 @@ internal static partial class Program
             Connected = true; return Task.CompletedTask;
         }
         public Task DisconnectAsync(CancellationToken token) { Connected = false; return Task.CompletedTask; }
-        public Task<CalendarSnapshot> GetSnapshotAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken token)
+        public async Task<CalendarSnapshot> GetSnapshotAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken token)
         {
             Requests++;
+            if (DelayMilliseconds > 0) await Task.Delay(DelayMilliseconds, token);
             if (SessionExpired) throw new CalendarAuthorizationException("Session expired");
             if (FailRequests) throw new HttpRequestException("Offline test");
             var today = new DateTimeOffset(DateTime.Today);
-            return Task.FromResult(new CalendarSnapshot([new("work", "Work", "#92ACFF"), new("personal", "Personal", "#67D7B0")],
+            return new CalendarSnapshot([new("work", "Work", "#92ACFF"), new("personal", "Personal", "#67D7B0")],
                 [new("a", "work", "Planning session", today.AddHours(10), today.AddHours(11), false, "#92ACFF", "Office", "Weekly planning"),
                  new("b", "work", "Project day", today, today.AddDays(1), true, "#92ACFF", "", ""),
-                 new("c", "personal", "Overnight event", today.AddHours(-2), today.AddHours(2), false, "#67D7B0", "", "")], DateTimeOffset.Now, start, end));
+                 new("c", "personal", "Overnight event", today.AddHours(-2), today.AddHours(2), false, "#67D7B0", "", "")], DateTimeOffset.Now, start, end);
         }
         public void Dispose() { }
     }

@@ -108,6 +108,24 @@
             <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="Opacity" Value="1"/></DataTrigger>
         </Style.Triggers>
     </Style>
+    <Style x:Key="QuietSyncStatus" TargetType="Grid">
+        <Setter Property="Visibility" Value="Hidden"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+            <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="SyncSpinner" TargetType="Grid">
+        <Style.Triggers>
+            <Trigger Property="IsVisible" Value="True">
+                <Trigger.EnterActions><BeginStoryboard x:Name="Spin"><Storyboard>
+                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever"/>
+                </Storyboard></BeginStoryboard></Trigger.EnterActions>
+                <Trigger.ExitActions><StopStoryboard BeginStoryboardName="Spin"/></Trigger.ExitActions>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
     <Style TargetType="ComboBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource Text}"/>
         <Setter Property="Padding" Value="12,8"/>

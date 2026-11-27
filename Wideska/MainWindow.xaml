@@ -37,7 +37,7 @@
                         <ComboBox HorizontalAlignment="Left" ItemsSource="{Binding Views}" DisplayMemberPath="Title" SelectedValuePath="Value" SelectedValue="{Binding View}" ToolTip="Calendar view" AutomationProperties.Name="Calendar view" FontSize="11"/>
                     </DockPanel>
                 </Grid>
-                <Grid Grid.Row="2">
+                <Grid x:Name="CalendarContent" Grid.Row="2">
                     <Grid Visibility="{Binding IsMonth, Converter={StaticResource VisibleIf}}">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <UniformGrid Columns="7" Margin="0,0,0,6" TextElement.FontSize="10">
@@ -77,10 +77,17 @@
                     </Viewbox>
                     </Grid>
                 </Grid>
-                <StackPanel Grid.Row="3" Margin="0,8,0,0" Style="{StaticResource QuietControls}">
-                    <ProgressBar Height="2" IsIndeterminate="True" Visibility="{Binding Busy, Converter={StaticResource VisibleIf}}" Margin="0,0,0,6"/>
-                    <TextBlock Text="{Binding Status}" Style="{StaticResource Caption}" FontSize="10" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Status}"/>
-                </StackPanel>
+                <Grid x:Name="SyncStatus" Grid.Row="3" Height="16" Margin="0,8,0,0" Style="{StaticResource QuietSyncStatus}">
+                    <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" VerticalAlignment="Center">
+                        <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
+                            <DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="Visibility" Value="Hidden"/></DataTrigger>
+                        </Style.Triggers></Style></TextBlock.Style>
+                    </TextBlock>
+                    <Grid Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5" Style="{StaticResource SyncSpinner}" Visibility="{Binding Busy, Converter={StaticResource VisibleIf}}" AutomationProperties.Name="Synchronizing calendars">
+                        <Grid.RenderTransform><RotateTransform/></Grid.RenderTransform>
+                        <Path Data="M 7,1 A 6,6 0 1 1 1,7" Stroke="{DynamicResource Accent}" StrokeThickness="1.75" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </Grid>
+                </Grid>
                 <Border Grid.RowSpan="4" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="20" HorizontalAlignment="Right" Width="340" Visibility="{Binding SettingsOpen, Converter={StaticResource VisibleIf}}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
                         <DockPanel><Button DockPanel.Dock="Right" Content="Done" Command="{Binding SaveSettingsCommand}"/><TextBlock Text="Make it yours" FontSize="22" FontWeight="Light"/></DockPanel>
