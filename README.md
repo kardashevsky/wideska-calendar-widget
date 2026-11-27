@@ -36,7 +36,7 @@ Synchronization status uses a fixed-height footer and appears only on hover or k
 
 ## Widget heading
 
-The widget has no in-content logo or product name; the application icon remains in the tray and executable. The selected month and year form the large heading (year only in the annual view). Day view adds the selected weekday and date, plus a calendar-local `HH:mm:ss` clock. The clock updates only its text each second while day view is visible; the minute-based timeline and Google synchronization remain separate. The interface uses graphite surfaces and cool blue accents in dark mode, with matching neutral light-mode colors. Google calendar colors are preserved.
+The widget has no in-content logo or product name; the application icon remains in the tray and executable. The selected month and year form the large heading (year only in the annual view). Day view adds the selected weekday and date. The red current-time badge inside the day/week grid shows the calendar-local `HH:mm:ss` clock. A separate drawing layer updates only the badge each second while a time-grid view is visible; the minute-based timeline and Google synchronization remain separate. The interface uses graphite surfaces and cool blue accents in dark mode, with matching neutral light-mode colors. Google calendar colors are preserved.
 
 ## Time scale and desktop hosting
 

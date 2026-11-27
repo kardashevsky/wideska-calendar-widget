@@ -18,9 +18,7 @@
                         <TextBlock Text="{Binding Period}" FontSize="42" FontWeight="SemiBold" TextWrapping="NoWrap"/>
                     </Viewbox>
                     <DockPanel Grid.Row="1" Margin="0,0,0,12" Visibility="{Binding IsSingleDay, Converter={StaticResource VisibleIf}}">
-                        <Border DockPanel.Dock="Right" BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0" Padding="14,0,0,0" Margin="12,0,0,0" ToolTip="{Binding CalendarTimeZoneLabel}">
-                            <TextBlock Text="{Binding ClockText}" FontFamily="Consolas" FontSize="23" Foreground="{DynamicResource Accent}" VerticalAlignment="Center"/>
-                        </Border>
+
                         <TextBlock Text="{Binding DayHeading}" FontSize="17" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
                             <TextBlock.Style><Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
@@ -54,7 +52,7 @@
                         </ItemsControl>
                     </Grid>
                     <ScrollViewer Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <controls:DayTimeline x:Name="Timeline" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
+                        <controls:DayTimeline x:Name="Timeline" ClockText="{Binding ClockText}" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
                     <Grid Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}">
                         <Viewbox Stretch="Uniform" MaxWidth="1440" HorizontalAlignment="Center" VerticalAlignment="Top">
