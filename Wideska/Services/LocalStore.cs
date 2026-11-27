@@ -4,41 +4,65 @@ using System.Text.Json;
 using Wideska.Models;
 
 namespace Wideska.Services;
+
 public sealed class LocalStore(string? storageDirectory = null)
 {
     private readonly string directory = storageDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Wideska");
     private readonly SemaphoreSlim gate = new(1, 1);
+    private string PathFor(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name is "." or ".." || name != Path.GetFileName(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            throw new ArgumentException("Storage names must be plain file names.", nameof(name));
+        return Path.Combine(directory, name);
+    }
     public async Task<T?> ReadAsync<T>(string name, bool encrypted, CancellationToken token = default)
     {
         await gate.WaitAsync(token);
         try
         {
-            string path = Path.Combine(directory, name);
+            string path = PathFor(name);
             if (!File.Exists(path)) return default;
             byte[] data = await File.ReadAllBytesAsync(path, token);
-            return JsonSerializer.Deserialize<T>(encrypted ? WindowsProtection.Transform(data, false) : data);
+            byte[] decoded = encrypted ? await Task.Run(() => WindowsProtection.Transform(data, false), token) : data;
+            try { return await Task.Run(() => JsonSerializer.Deserialize<T>(decoded), token); }
+            finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(decoded); }
         }
         catch (Exception ex) when (ex is IOException or JsonException or System.ComponentModel.Win32Exception) { return default; }
         finally { gate.Release(); }
     }
     public async Task WriteAsync<T>(string name, T value, bool encrypted, CancellationToken token = default)
     {
+        string path = PathFor(name);
         await gate.WaitAsync(token);
+        string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             Directory.CreateDirectory(directory);
-            byte[] data = JsonSerializer.SerializeToUtf8Bytes(value);
-            if (encrypted) data = WindowsProtection.Transform(data, true);
-            string path = Path.Combine(directory, name);
-            await File.WriteAllBytesAsync(path + ".tmp", data, token);
-            File.Move(path + ".tmp", path, true);
+            byte[] data = value is CalendarSnapshot
+                ? await Task.Run(() => JsonSerializer.SerializeToUtf8Bytes(value), token)
+                : JsonSerializer.SerializeToUtf8Bytes(value);
+            if (encrypted)
+            {
+                byte[] plaintext = data;
+                try { data = await Task.Run(() => WindowsProtection.Transform(plaintext, true), token); }
+                finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(plaintext); }
+            }
+            await File.WriteAllBytesAsync(temporary, data, token);
+            token.ThrowIfCancellationRequested();
+            File.Move(temporary, path, true);
         }
-        finally { gate.Release(); }
+        finally
+        {
+            try { File.Delete(temporary); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            gate.Release();
+        }
     }
     public async Task DeleteAsync(string name)
     {
         await gate.WaitAsync();
-        try { File.Delete(Path.Combine(directory, name)); }
+        try { File.Delete(PathFor(name)); }
         finally { gate.Release(); }
     }
 }
