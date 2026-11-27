@@ -19,7 +19,7 @@ internal static partial class Program
         double afterTop = header.TransformToAncestor(window).Transform(new Point()).Y;
         Check(viewer.VerticalOffset > 0 && Math.Abs(afterTop - initialTop) < .5, "Day/date and all-day header must stay at the same screen position while hours scroll");
         double headerHeight = header.ContentBounds.Height;
-        var allDay = timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, viewer.VerticalOffset + 60));
+        var allDay = timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, viewer.VerticalOffset + 48));
         Check(allDay?.AllDay == true, "Pinned all-day cards must retain their event hit targets after scrolling");
         var hidden = timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, viewer.VerticalOffset + headerHeight - 2));
         Check(hidden is null, "Events scrolling under the pinned header must not receive clicks through it");
