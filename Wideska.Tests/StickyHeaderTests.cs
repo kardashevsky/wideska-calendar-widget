@@ -37,20 +37,29 @@ internal static partial class Program
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, 900)) is null, "Empty hourly slots must not be treated as event hit targets");
         double eventY = headerHeight + 655d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, eventY))?.Title == "Planning session", "Timed event hit targets must remain aligned after scrolling");
-        foreach (int delta in new[] { -120, 120 })
+        double halfHourHeight = (timeline.ActualHeight - headerHeight - DayTimeline.TimelineBottomPadding) / 48;
+        foreach (int delta in new[] { -120, 120, -240, 60 })
         {
             timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, delta)
-                { RoutedEvent = UIElement.MouseWheelEvent });
+                { RoutedEvent = UIElement.PreviewMouseWheelEvent });
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             double settledOffset = viewer.VerticalOffset;
             Check(delta < 0 ? settledOffset > savedOffset : settledOffset < savedOffset,
                 "Wheel input must immediately scroll in its requested direction");
+            Check(Math.Abs(settledOffset - (savedOffset - delta / 120d * halfHourHeight)) < .5,
+                "Each wheel detent must scroll one half-hour, including high-resolution and multi-detent input");
             await Task.Delay(300);
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(Math.Abs(viewer.VerticalOffset - settledOffset) < .5,
                 "Wheel scrolling must not apply a second delayed movement");
             savedOffset = settledOffset;
         }
+        for (int i = 0; i < 3; i++)
+            timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
+                { RoutedEvent = UIElement.PreviewMouseWheelEvent });
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Check(Math.Abs(viewer.VerticalOffset - savedOffset - 3 * halfHourHeight) < .5,
+            "Rapid wheel events must accumulate without losing steps before layout");
         SavePreview(window, "sticky-day-header", true);
     }
 }
