@@ -176,7 +176,7 @@
                                     <TextBlock Text="LOCATION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Location}" FontSize="13"/>
                                 </StackPanel>
                                 <StackPanel Visibility="{Binding HasDescription, Converter={StaticResource VisibleIf}}">
-                                    <TextBlock Text="DESCRIPTION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Description}" FontSize="13" LineHeight="20"/>
+                                    <TextBlock Text="DESCRIPTION" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:LinkTextBlock ContentText="{Binding Description}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>

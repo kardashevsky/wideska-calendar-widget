@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Net;
 using System.Net.Http;
@@ -36,6 +36,14 @@ internal static partial class Program
     }
     private static async Task RunAsync(Application app)
     {
+        string linkedDescription = EventText.ToPlainText("Join <a href='https://example.com/meet?a=1&amp;b=2'>meeting</a>");
+        Check(linkedDescription.Contains("https://example.com/meet?a=1&b=2"), "HTML descriptions must preserve link destinations and decode query parameters");
+        var linkText = new Wideska.Controls.LinkTextBlock { ContentText = linkedDescription + " www.example.org. https://example.com/page)." };
+        var hyperlinks = linkText.Inlines.OfType<System.Windows.Documents.Hyperlink>().ToArray();
+        Check(hyperlinks.Length == 3 && hyperlinks[0].NavigateUri.Query == "?a=1&b=2", "Description links must become clickable hyperlinks with intact query strings");
+        Check(hyperlinks[1].NavigateUri.AbsoluteUri == "https://www.example.org/" && hyperlinks[2].NavigateUri.AbsoluteUri == "https://example.com/page", "Link detection must support www addresses and exclude surrounding punctuation");
+        linkText.ContentText = "javascript:alert(1) file:///C:/private.txt";
+        Check(!linkText.Inlines.OfType<System.Windows.Documents.Hyperlink>().Any(), "Descriptions must not activate executable or local file links");
         string directory = Path.Combine(Path.GetTempPath(), "Wideska-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
