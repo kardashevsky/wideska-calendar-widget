@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Wideska.Services;
+using Wideska.Infrastructure;
 using Wideska.ViewModels;
 
 namespace Wideska.Controls;
@@ -46,9 +47,10 @@ public sealed class DayTimeline : Control
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> headerHits = [];
     private ScrollViewer? scrollOwner;
     private const double WheelDistance = 72;
-    private const double ScrollDurationSeconds = .17;
     private readonly System.Diagnostics.Stopwatch scrollAnimationClock = new();
-    private double scrollStartOffset;
+    private readonly ScrollMotion scrollMotion = new();
+    private double lastScrollFrameSeconds;
+    private TimeSpan? lastRenderingTime;
     private double scrollTargetOffset;
     private double expectedScrollOffset;
     private int wheelDirection;
@@ -107,7 +109,9 @@ public sealed class DayTimeline : Control
             double offset = IsScrollAnimating && wheelDirection == direction ? scrollTargetOffset : scrollOwner.VerticalOffset;
             scrollTargetOffset = Math.Clamp(offset - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * WheelDistance,
                 0, scrollOwner.ScrollableHeight);
-            scrollStartOffset = expectedScrollOffset = scrollOwner.VerticalOffset;
+            if (!IsScrollAnimating || wheelDirection != direction) scrollMotion.Reset(scrollOwner.VerticalOffset);
+            expectedScrollOffset = scrollOwner.VerticalOffset;
+            scrollMotion.Retarget(scrollTargetOffset);
             wheelDirection = direction;
             if (!SystemParameters.ClientAreaAnimation)
             {
@@ -116,8 +120,13 @@ public sealed class DayTimeline : Control
             }
             else
             {
-                if (!IsScrollAnimating) CompositionTarget.Rendering += OnScrollFrame;
-                scrollAnimationClock.Restart();
+                if (!IsScrollAnimating)
+                {
+                    lastScrollFrameSeconds = 0;
+                    lastRenderingTime = null;
+                    CompositionTarget.Rendering += OnScrollFrame;
+                    scrollAnimationClock.Restart();
+                }
             }
             e.Handled = true;
         };
@@ -129,6 +138,7 @@ public sealed class DayTimeline : Control
         MouseLeave += (_, _) => { Cursor = Cursors.Arrow; ClearHover(); };
         MouseMove += (_, e) =>
         {
+            if (IsScrollAnimating) { Cursor = Cursors.Arrow; ClearHover(); return; }
             var hit = ItemAt(e.GetPosition(this));
             Cursor = hit.Event is not null ? Cursors.Hand : Cursors.Arrow;
             string? details = hit.Details;
@@ -151,11 +161,18 @@ public sealed class DayTimeline : Control
     private void OnScrollFrame(object? sender, EventArgs e)
     {
         if (scrollOwner is null || !IsVisible) { StopScrollAnimation(); return; }
-        double progress = Math.Clamp(scrollAnimationClock.Elapsed.TotalSeconds / ScrollDurationSeconds, 0, 1);
-        double eased = 1 - Math.Pow(1 - progress, 3);
-        expectedScrollOffset = Math.Clamp(scrollStartOffset + (scrollTargetOffset - scrollStartOffset) * eased, 0, scrollOwner.ScrollableHeight);
+        if (e is RenderingEventArgs rendering)
+        {
+            if (lastRenderingTime == rendering.RenderingTime) return;
+            lastRenderingTime = rendering.RenderingTime;
+        }
+        double now = scrollAnimationClock.Elapsed.TotalSeconds;
+        scrollMotion.Advance(now - lastScrollFrameSeconds);
+        lastScrollFrameSeconds = now;
+        bool settled = scrollMotion.IsSettled;
+        expectedScrollOffset = Math.Clamp(settled ? scrollTargetOffset : scrollMotion.Position, 0, scrollOwner.ScrollableHeight);
         scrollOwner.ScrollToVerticalOffset(expectedScrollOffset);
-        if (progress >= 1) StopScrollAnimation();
+        if (settled) StopScrollAnimation();
     }
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
@@ -189,22 +206,25 @@ public sealed class DayTimeline : Control
         if (IsScrollAnimating && ((e.VerticalChange != 0 && Math.Abs(e.VerticalOffset - expectedScrollOffset) > 1)
             || e.ViewportHeightChange != 0 || e.ExtentHeightChange != 0)) StopScrollAnimation();
         if (e.VerticalChange == 0 && e.HorizontalChange == 0 && e.ViewportHeightChange == 0 && e.ViewportWidthChange == 0) return;
-        ClearHover(); UpdateHeaderPosition();
-        if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
+        ClearHover(); UpdateHeaderPosition(e.HorizontalChange != 0 || e.ViewportWidthChange != 0);
+        if (IsMouseOver) Cursor = !IsScrollAnimating && ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
     }
-    private void UpdateHeaderPosition()
+    private void UpdateHeaderPosition(bool notifyViewport = true)
     {
         double offset = scrollOwner?.VerticalOffset ?? 0;
-        stickyHeader.Transform = new TranslateTransform(0, offset);
+        if (stickyHeader.Transform is TranslateTransform headerTransform && !headerTransform.IsFrozen) headerTransform.Y = offset;
+        else stickyHeader.Transform = new TranslateTransform(0, offset);
         // Custom visuals must stay inside the visible scroll viewport, including above the pinned header.
         double left = scrollOwner?.HorizontalOffset ?? 0;
         double width = scrollOwner?.ViewportWidth ?? ActualWidth;
         double height = scrollOwner?.ViewportHeight ?? ActualHeight;
         var viewport = new Rect(left, offset, Math.Max(0, width), Math.Max(0, height));
-        if (Clip is not RectangleGeometry currentClip || currentClip.Rect != viewport)
-            Clip = new RectangleGeometry(viewport);
-        timeBadge.Clip = new RectangleGeometry(new Rect(0, offset + headerHeight, ActualWidth, Math.Max(0, ActualHeight - offset - headerHeight)));
-        ViewportChanged?.Invoke();
+        if (Clip is RectangleGeometry currentClip && !currentClip.IsFrozen) currentClip.Rect = viewport;
+        else Clip = new RectangleGeometry(viewport);
+        var badgeClip = new Rect(0, offset + headerHeight, ActualWidth, Math.Max(0, ActualHeight - offset - headerHeight));
+        if (timeBadge.Clip is RectangleGeometry currentBadgeClip && !currentBadgeClip.IsFrozen) currentBadgeClip.Rect = badgeClip;
+        else timeBadge.Clip = new RectangleGeometry(badgeClip);
+        if (notifyViewport) ViewportChanged?.Invoke();
     }
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {

@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Use fast frame-driven wheel scrolling with a 170 ms ease-out, immediate direction changes and no delayed snapping.
+- Use continuous frame-driven wheel scrolling that preserves velocity across repeated wheel input, with no delayed snapping or overshoot.
+- Skip duplicate rendering timestamps and reuse sticky-header transforms and clipping geometry during scrolling.
 - Stop scroll rendering callbacks when idle, hidden or unloaded, and respect Windows animation preferences.
 - Use zero-padded 24-hour event times in both interface languages.
 - Remove delayed half-hour snapping that caused a second movement after wheel scrolling.

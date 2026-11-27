@@ -37,6 +37,37 @@ internal static partial class Program
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, 900)) is null, "Empty hourly slots must not be treated as event hit targets");
         double eventY = headerHeight + 655d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, eventY))?.Title == "Planning session", "Timed event hit targets must remain aligned after scrolling");
+        var frameClock = System.Diagnostics.Stopwatch.StartNew();
+        var frameTimes = new List<double>();
+        var scrollTimes = new List<double>();
+        TimeSpan? previousRenderingTime = null;
+        void RecordFrame(object? sender, EventArgs e)
+        {
+            if (e is RenderingEventArgs rendering)
+            {
+                if (rendering.RenderingTime == previousRenderingTime) return;
+                previousRenderingTime = rendering.RenderingTime;
+            }
+            frameTimes.Add(frameClock.Elapsed.TotalMilliseconds);
+        }
+        void RecordScroll(object sender, ScrollChangedEventArgs e) { if (e.VerticalChange != 0) scrollTimes.Add(frameClock.Elapsed.TotalMilliseconds); }
+        CompositionTarget.Rendering += RecordFrame;
+        viewer.ScrollChanged += RecordScroll;
+        try
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
+                    { RoutedEvent = UIElement.PreviewMouseWheelEvent });
+                await Task.Delay(45);
+            }
+            await Task.Delay(450);
+        }
+        finally { CompositionTarget.Rendering -= RecordFrame; viewer.ScrollChanged -= RecordScroll; }
+        var frameGaps = frameTimes.Zip(frameTimes.Skip(1), (a, b) => b - a).Where(g => g > 1).Order().ToArray();
+        Console.WriteLine($"Scroll frame sample: frames={frameTimes.Count}, offset updates={scrollTimes.Count}, median gap={(frameGaps.Length == 0 ? 0 : frameGaps[frameGaps.Length / 2]):F1} ms, maximum gap={frameGaps.DefaultIfEmpty().Max():F1} ms");
+        viewer.ScrollToVerticalOffset(savedOffset);
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         foreach (int delta in new[] { -120, 120, -240, 60 })
         {
             timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, delta)
@@ -48,7 +79,7 @@ internal static partial class Program
                 Check(Math.Abs(viewer.VerticalOffset - savedOffset) < Math.Abs(delta / 120d * 72),
                     "Smooth scrolling must have an intermediate position instead of jumping to its target");
             }
-            await Task.Delay(240);
+            await Task.Delay(380);
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             double settledOffset = viewer.VerticalOffset;
             Check(Math.Abs(settledOffset - (savedOffset - delta / 120d * 72)) < .5,
@@ -62,7 +93,7 @@ internal static partial class Program
         for (int i = 0; i < 3; i++)
             timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
                 { RoutedEvent = UIElement.PreviewMouseWheelEvent });
-        await Task.Delay(260);
+        await Task.Delay(400);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(Math.Abs(viewer.VerticalOffset - savedOffset - 216) < .5,
             "Rapid wheel events must accumulate without losing distance");
@@ -70,7 +101,7 @@ internal static partial class Program
             { RoutedEvent = UIElement.PreviewMouseWheelEvent });
         timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, 120)
             { RoutedEvent = UIElement.PreviewMouseWheelEvent });
-        await Task.Delay(260);
+        await Task.Delay(400);
         Check(Math.Abs(viewer.VerticalOffset - savedOffset - 144) < .5,
             "Reversing direction must immediately discard the previous forward target");
         timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
