@@ -32,6 +32,8 @@ dotnet build Wideska/Wideska.slnx -c Release --artifacts-path artifacts/build
 .\artifacts\build\bin\Wideska\release\Wideska.exe
 ```
 
+Synchronization status uses a fixed-height footer and appears only on hover or keyboard interaction. While synchronizing, a small spinner replaces the last-update text without changing calendar dimensions. The spinner stops when hidden; background synchronization does not announce each minute.
+
 ## Widget heading
 
 The widget has no in-content logo or product name; the application icon remains in the tray and executable. The selected month and year form the large heading (year only in the annual view). Day view adds the selected weekday and date, plus a calendar-local `HH:mm:ss` clock. The clock updates only its text each second while day view is visible; the minute-based timeline and Google synchronization remain separate. The interface uses graphite surfaces and cool blue accents in dark mode, with matching neutral light-mode colors. Google calendar colors are preserved.

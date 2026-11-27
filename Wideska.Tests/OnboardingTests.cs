@@ -71,6 +71,17 @@ internal static partial class Program
         await vm.ConnectAsync();
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(vm.ShowWidget && !vm.ShowAuthorization && vm.Calendars.Count == 2, "Successful consent must reveal and synchronize the widget");
+        var calendarContent = (FrameworkElement)window.FindName("CalendarContent");
+        var syncStatus = (FrameworkElement)window.FindName("SyncStatus");
+        double contentHeight = calendarContent.ActualHeight;
+        provider.DelayMilliseconds = 250;
+        Task pendingSync = vm.RefreshAsync();
+        syncStatus.SetCurrentValue(UIElement.VisibilityProperty, Visibility.Visible);
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Check(vm.Busy && contentHeight > 0 && calendarContent.ActualHeight == contentHeight && syncStatus.ActualHeight == 16, "Synchronization must replace the status in place without shifting calendar layout");
+        await pendingSync;
+        provider.DelayMilliseconds = 0;
+        syncStatus.ClearValue(UIElement.VisibilityProperty);
         vm.View = CalendarView.SingleDay; vm.TodayCommand.Execute(null);
         var selected = vm.Days[0].Events.First(e => e.HasDescription);
         vm.OpenEventCommand.Execute(selected);
