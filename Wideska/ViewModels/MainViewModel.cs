@@ -257,7 +257,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public void SetClockVisible(bool visible) { clockVisible = visible; UpdateClockSchedule(); }
     private void UpdateClockSchedule()
     {
-        if (!clockVisible || !ShowWidget || !IsSingleDay || lifetime.IsCancellationRequested) { secondTimer.Stop(); return; }
+        if (!clockVisible || !ShowWidget || !IsDays || lifetime.IsCancellationRequested) { secondTimer.Stop(); return; }
         clockTime = DateTimeOffset.UtcNow; Changed(nameof(ClockText)); AlignClockTick();
     }
     private void AlignClockTick()

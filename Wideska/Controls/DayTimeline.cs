@@ -16,6 +16,8 @@ public sealed class DayTimeline : Control
     public static readonly DependencyProperty TimeZoneIdProperty = DependencyProperty.Register(nameof(TimeZoneId), typeof(string), typeof(DayTimeline), new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty GridBrushProperty = DependencyProperty.Register(nameof(GridBrush), typeof(Brush), typeof(DayTimeline), new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty EventCommandProperty = DependencyProperty.Register(nameof(EventCommand), typeof(ICommand), typeof(DayTimeline));
+    public static readonly DependencyProperty ClockTextProperty = DependencyProperty.Register(nameof(ClockText), typeof(string), typeof(DayTimeline), new PropertyMetadata("", (d, _) => ((DayTimeline)d).RenderTimeBadge()));
+    public string ClockText { get => (string)GetValue(ClockTextProperty); set => SetValue(ClockTextProperty, value); }
     public ICommand? EventCommand { get => (ICommand?)GetValue(EventCommandProperty); set => SetValue(EventCommandProperty, value); }
     public static readonly DependencyProperty SurfaceBrushProperty = ThemeBrush(nameof(SurfaceBrush), "#ED1D2730");
     public static readonly DependencyProperty MutedBrushProperty = ThemeBrush(nameof(MutedBrush), "#BBCAD5");
@@ -44,8 +46,15 @@ public sealed class DayTimeline : Control
     private readonly ToolTip eventToolTip = new();
     private bool scrollPending;
     private Rect slotArea = Rect.Empty;
+    private readonly DrawingVisual timeBadge = new();
+    private double badgeY = double.NaN;
+    protected override int VisualChildrenCount => 1;
+    protected override Visual GetVisualChild(int index) => index == 0 ? timeBadge : throw new ArgumentOutOfRangeException(nameof(index));
+    protected override Size MeasureOverride(Size availableSize) => new(double.IsFinite(availableSize.Width) ? availableSize.Width : MinWidth, MinimumTimelineHeight);
+    protected override Size ArrangeOverride(Size finalSize) => finalSize;
     public DayTimeline()
     {
+        AddVisualChild(timeBadge);
         MinHeight = MinimumTimelineHeight;
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         Loaded += (_, _) => { Observe(); ScheduleScroll(); };
@@ -104,7 +113,7 @@ public sealed class DayTimeline : Control
         });
     }
     public const double MinimumTimelineHeight = 1480;
-    public const double TimeGutterWidth = 76;
+    public const double TimeGutterWidth = 96;
     private const double DayHeaderHeight = 48;
     private const double AllDayRowHeight = 28;
     private double TimeStart(IReadOnlyList<DayCell> days) => DayHeaderHeight + Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay))) * AllDayRowHeight + 24;
@@ -119,9 +128,9 @@ public sealed class DayTimeline : Control
     }
     protected override void OnRender(DrawingContext dc)
     {
-        base.OnRender(dc); hits.Clear(); slotArea = Rect.Empty;
+        base.OnRender(dc); hits.Clear(); slotArea = Rect.Empty; badgeY = double.NaN;
         var days = Days?.ToList() ?? [];
-        if (days.Count == 0 || ActualWidth <= TimeGutterWidth) return;
+        if (days.Count == 0 || ActualWidth <= TimeGutterWidth) { RenderTimeBadge(); return; }
         double column = (ActualWidth - TimeGutterWidth) / days.Count;
         int allDayRows = Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay)));
         double startY = TimeStart(days);
@@ -184,11 +193,19 @@ public sealed class DayTimeline : Control
         if (today >= 0 && nowMinutes is not null)
         {
             double x = TimeGutterWidth + today * column;
-            dc.DrawRoundedRectangle(NowBrush, null, new Rect(3, nowY - 11, 54, 22), 7, 7);
-            Text(dc, CalendarTime.Local(CurrentTime, TimeZoneId).ToString("HH:mm"), 6, nowY - 8, 48, 11, Brushes.White, FontWeights.SemiBold, TextAlignment.Center);
+            badgeY = nowY;
             dc.DrawLine(new Pen(NowBrush, 1.75), new Point(x + 4, nowY), new Point(x + column - 3, nowY));
             dc.DrawEllipse(NowBrush, null, new Point(x + 4, nowY), 4, 4);
         }
+        RenderTimeBadge();
+    }
+    private void RenderTimeBadge()
+    {
+        using var dc = timeBadge.RenderOpen();
+        if (double.IsNaN(badgeY)) return;
+        dc.DrawRoundedRectangle(NowBrush, null, new Rect(3, badgeY - 11, 76, 22), 7, 7);
+        string text = string.IsNullOrEmpty(ClockText) ? CalendarTime.Local(CurrentTime, TimeZoneId).ToString("HH:mm:ss") : ClockText;
+        Text(dc, text, 6, badgeY - 8, 70, 11, Brushes.White, FontWeights.SemiBold, TextAlignment.Center);
     }
     private void Event(DrawingContext dc, EventItem item, Rect rect, bool timed)
     {
