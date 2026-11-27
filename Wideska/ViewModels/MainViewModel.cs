@@ -9,6 +9,7 @@ using Wideska.Providers;
 using Wideska.Services;
 
 namespace Wideska.ViewModels;
+
 public sealed class CalendarSelection(CalendarInfo calendar, bool visible, Action changed) : ObservableObject
 {
     public CalendarInfo Calendar { get; } = calendar;
@@ -16,7 +17,7 @@ public sealed class CalendarSelection(CalendarInfo calendar, bool visible, Actio
     public bool Visible { get => visible; set { if (Set(ref visible, value)) changed(); } }
 }
 public sealed record EventItem(string Title, string Time, string Color, string Details, bool AllDay = false, double StartMinute = 0, double EndMinute = 0,
-    string Description = "", string Location = "", string CalendarName = "", string DateLabel = "", string TimeZoneLabel = "")
+    string Description = "", string Location = "", string CalendarName = "", string DateLabel = "", string TimeZoneLabel = "", string EventId = "", string CalendarId = "")
 {
     public bool IsSleepCalendar => string.Equals(CalendarName.Trim(), "Sleep", StringComparison.OrdinalIgnoreCase) || string.Equals(CalendarName.Trim(), "Сон", StringComparison.OrdinalIgnoreCase);
     public bool HasLocation => !string.IsNullOrWhiteSpace(Location);
@@ -24,15 +25,16 @@ public sealed record EventItem(string Title, string Time, string Color, string D
 }
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
-    public string Label => $"{Date.ToString("ddd", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture)}, {Date.Day}";
-    public string FullLabel => $"{Date.ToString("ddd", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture)}, {CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Date.ToString("d MMMM", CultureInfo.CurrentCulture))}";
+    public string Label => $"{Date.ToString("ddd", AppLocalization.Culture).ToUpper(AppLocalization.Culture)}, {Date.Day}";
+    public string FullLabel => $"{Date.ToString("ddd", AppLocalization.Culture).ToUpper(AppLocalization.Culture)}, {AppLocalization.Culture.TextInfo.ToTitleCase(Date.ToString("d MMMM", AppLocalization.Culture))}";
     public bool IsWeekend => Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     public string Number => Date.Day.ToString(CultureInfo.InvariantCulture);
     public IEnumerable<EventItem> PreviewEvents => Events.Take(1);
-    public string Summary => Events.Count == 0 ? Date.ToString("D") : string.Join("\n", Events.Select(e => $"{e.Time}  {e.Title}"));
+    public string Summary => Events.Count == 0 ? Date.ToString("D", AppLocalization.Culture) : string.Join("\n", Events.Select(e => $"{e.Time}  {e.Title}"));
 }
 public sealed record MonthItem(string Title, IReadOnlyList<DayCell> Days);
 public sealed record QuarterItem(string Label, string Range, IReadOnlyList<MonthItem> Months);
+public sealed record LanguageChoice(string Value, string Title);
 public sealed record ViewChoice(CalendarView Value, string Title)
 {
     public override string ToString() => Title;
@@ -45,15 +47,21 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 {
     private readonly LocalStore store;
     private readonly ICalendarProvider provider;
+    private readonly Dictionary<CalendarEvent, string> descriptions = new(ReferenceEqualityComparer.Instance);
     private readonly CancellationTokenSource lifetime = new();
+    private readonly CancellationToken lifetimeToken;
+    private CancellationTokenSource? saveDebounce;
     private readonly SemaphoreSlim syncGate = new(1, 1);
     private Task? refreshLoop;
+    private Task? shutdownTask;
+    private Task? initializationTask;
+    private bool disposed;
     private readonly DispatcherTimer minuteTimer = new();
     private readonly DispatcherTimer secondTimer = new();
     private bool clockVisible;
     private DateTimeOffset clockTime = DateTimeOffset.UtcNow;
-    public string ClockText => CalendarTime.Local(clockTime, CalendarTimeZoneId).ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-    public string DayHeading => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(anchor.ToString("dddd, d", CultureInfo.CurrentCulture));
+    public string ClockText => CalendarTime.Local(clockTime, CalendarTimeZoneId).ToString("HH:mm:ss", AppLocalization.Culture);
+    public string DayHeading => AppLocalization.Culture.TextInfo.ToTitleCase(anchor.ToString("dddd, d", AppLocalization.Culture));
     public bool IsWeekendHeading => anchor.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     public bool IsSingleDay => View == CalendarView.SingleDay;
     private DateTimeOffset currentTime = DateTimeOffset.UtcNow;
@@ -76,7 +84,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
     public CornerRadius WidgetCornerRadius => new(IsDesktopFilled ? 0 : 24);
-    public string DesktopSizeActionLabel => IsDesktopFilled ? "Restore widget size" : "Fill desktop work area";
+    public string DesktopSizeActionLabel => IsDesktopFilled ? AppLocalization.Text("Restore widget size") : AppLocalization.Text("Fill desktop work area");
     private EventItem? selectedEvent;
     public EventItem? SelectedEvent { get => selectedEvent; private set { if (Set(ref selectedEvent, value)) { Changed(nameof(IsEventOpen)); Changed(nameof(IsCalendarEnabled)); } } }
     public bool IsEventOpen => SelectedEvent is not null;
@@ -92,12 +100,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<DayCell> Days { get; } = [];
     public ObservableCollection<MonthItem> Months { get; } = [];
     public ObservableCollection<QuarterItem> Quarters { get; } = [];
-    public ViewChoice[] Views { get; } = [new(CalendarView.SingleDay, "Day"), new(CalendarView.ThreeDays, "3 days"), new(CalendarView.Workweek, "Workweek"), new(CalendarView.Week, "Week"), new(CalendarView.Month, "Month"), new(CalendarView.Year, "Year")];
-    public BehaviorChoice[] Behaviors { get; } = [new(WindowBehavior.Normal, "Normal window"), new(WindowBehavior.AlwaysOnTop, "Always on top"), new(WindowBehavior.Desktop, "Behind other windows")];
+    public ViewChoice[] Views => [new(CalendarView.SingleDay, AppLocalization.Text("Day")), new(CalendarView.ThreeDays, AppLocalization.Text("3 days")), new(CalendarView.Workweek, AppLocalization.Text("Workweek")), new(CalendarView.Week, AppLocalization.Text("Week")), new(CalendarView.Month, AppLocalization.Text("Month")), new(CalendarView.Year, AppLocalization.Text("Year"))];
+    public BehaviorChoice[] Behaviors => [new(WindowBehavior.Normal, AppLocalization.Text("Normal window")), new(WindowBehavior.AlwaysOnTop, AppLocalization.Text("Always on top")), new(WindowBehavior.Desktop, AppLocalization.Text("Behind other windows"))];
     private DateTime anchor = DateTime.Today;
     private bool followToday = true;
     private string status = "Connect Google Calendar to display your events.";
-    public string Status { get => status; private set => Set(ref status, value); }
+    public string Status { get => AppLocalization.Text(status); private set => Set(ref status, value); }
     private bool busy;
     public bool Busy { get => busy; private set => Set(ref busy, value); }
     private bool connected;
@@ -115,7 +123,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool ShowWidget => IsInitialized && Connected;
     public bool ShowAuthorization => !ShowWidget;
     public bool HasCredentials => !string.IsNullOrWhiteSpace(ClientId);
-    public string CredentialStatus => HasCredentials ? "Desktop OAuth client is ready" : "Import your Google Desktop OAuth file to get started";
+    public string CredentialStatus => HasCredentials ? AppLocalization.Text("Desktop OAuth client is ready") : AppLocalization.Text("Import your Google Desktop OAuth file to get started");
     private void NotifyPresentation()
     {
         Changed(nameof(ShowWidget)); Changed(nameof(ShowAuthorization));
@@ -124,10 +132,26 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         UpdateClockSchedule();
         AppearanceChanged?.Invoke();
     }
-    public string ConnectionLabel => Connected ? "Google Calendar connected" : "No account connected";
+    public string ConnectionLabel => Connected ? AppLocalization.Text("Google Calendar connected") : AppLocalization.Text("No account connected");
     private bool settingsOpen;
     public bool SettingsOpen { get => settingsOpen; set { Set(ref settingsOpen, value); if (value) SelectedEvent = null; } }
-    public string Period => View == CalendarView.Year ? anchor.ToString("yyyy") : CultureInfo.CurrentCulture.TextInfo.ToTitleCase(anchor.ToString("MMMM yyyy"));
+    public LanguageChoice[] Languages => [new("system", AppLocalization.Text("System language")), new("ru", "Русский"), new("en", "English")];
+    public string Language
+    {
+        get => Settings.Language;
+        set
+        {
+            if (value is not ("system" or "ru" or "en") || Settings.Language == value) return;
+            Settings.Language = value; AppLocalization.Apply(value);
+            Changed(nameof(Language)); Changed(nameof(Languages)); Changed(nameof(Views));
+            Changed(nameof(CredentialStatus)); Changed(nameof(ConnectionLabel)); Changed(nameof(DesktopSizeActionLabel)); Changed(nameof(Status)); Changed(nameof(Behaviors));
+            Rebuild(); _ = SaveSafelyAsync();
+        }
+    }
+    public bool ShouldShowToday => IsYear ? !Months.Any(m => m.Days.Any(d => d.Today && d.InMonth)) : !Days.Any(d => d.Today);
+    public string HeaderMonth => IsYear ? anchor.Year.ToString(AppLocalization.Culture) : AppLocalization.Culture.TextInfo.ToTitleCase(anchor.ToString("MMMM", AppLocalization.Culture));
+    public string HeaderYear => IsYear ? "" : anchor.Year.ToString(AppLocalization.Culture);
+    public string Period => View == CalendarView.Year ? anchor.ToString("yyyy") : AppLocalization.Culture.TextInfo.ToTitleCase(anchor.ToString("MMMM yyyy", AppLocalization.Culture));
     public bool IsYear => View == CalendarView.Year;
     public bool IsMonth => View == CalendarView.Month;
     public bool IsDays => !IsYear && !IsMonth;
@@ -156,6 +180,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ICommand SelectDayCommand { get; }
     public MainViewModel(LocalStore store, ICalendarProvider provider)
     {
+        lifetimeToken = lifetime.Token;
+        AppLocalization.EnsureInitialized();
         this.store = store; this.provider = provider;
         OpenEventCommand = new RelayCommand(value => { if (ShowWidget && value is EventItem item) { SettingsOpen = false; SelectedEvent = item; } });
         CloseEventCommand = new RelayCommand(_ => SelectedEvent = null);
@@ -164,20 +190,29 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         secondTimer.Tick += (_, _) => { clockTime = DateTimeOffset.UtcNow; Changed(nameof(ClockText)); AlignClockTick(); };
         PreviousCommand = new RelayCommand(_ => Navigate(-1));
         NextCommand = new RelayCommand(_ => Navigate(1));
-        TodayCommand = new RelayCommand(_ => { followToday = true; anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date; Rebuild(); _ = RefreshIfNeededAsync(); });
+        TodayCommand = new RelayCommand(_ =>
+        {
+            followToday = true;
+            anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
+            // A workweek cannot display Saturday/Sunday, so make the explicit "Show today" action useful there too.
+            if (View == CalendarView.Workweek && anchor.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) View = CalendarView.SingleDay;
+            else Rebuild();
+            _ = RefreshIfNeededAsync();
+        });
         RefreshCommand = new AsyncCommand(RefreshAsync, ReportError);
         ConnectCommand = new AsyncCommand(ConnectAsync, ReportError);
         DisconnectCommand = new AsyncCommand(async () =>
         {
-            await syncGate.WaitAsync(lifetime.Token);
+            await syncGate.WaitAsync(lifetimeToken);
             Busy = true;
             try
             {
                 SelectedEvent = null; SettingsOpen = false; Connected = false;
                 snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); Rebuild();
                 Status = "Disconnecting Google account…";
-                await store.DeleteAsync("calendar-cache.bin");
-                await provider.DisconnectAsync(lifetime.Token);
+                // A locked/read-only cache must not prevent removing the Google credentials.
+                try { await store.DeleteAsync("calendar-cache.bin"); }
+                finally { await provider.DisconnectAsync(lifetimeToken); }
                 Status = "Account disconnected. Sign in to show your desktop calendar.";
             }
             finally { Busy = false; syncGate.Release(); }
@@ -188,7 +223,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     public async Task ImportCredentialsAsync(string path)
     {
-        var configuration = await GoogleOAuthConfiguration.ReadAsync(path, lifetime.Token);
+        var configuration = await GoogleOAuthConfiguration.ReadAsync(path, lifetimeToken);
         ClientId = configuration.ClientId;
         ClientSecret = configuration.ClientSecret;
         await SaveAsync();
@@ -196,12 +231,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     public async Task ConnectAsync()
     {
-        await syncGate.WaitAsync(lifetime.Token);
+        await syncGate.WaitAsync(lifetimeToken);
         Busy = true;
         Status = "Complete authorization in your browser…";
         try
         {
-            await provider.ConnectAsync(ClientId, ClientSecret, lifetime.Token);
+            await provider.ConnectAsync(ClientId, ClientSecret, lifetimeToken);
             Connected = true;
             snapshot = new([], [], default);
             eventsByDay.Clear(); Calendars.Clear(); Rebuild();
@@ -211,19 +246,26 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         finally { Busy = false; syncGate.Release(); }
         await RefreshAsync();
     }
-    public async Task InitializeAsync()
+    public Task InitializeAsync() => initializationTask ??= InitializeCoreAsync();
+    private async Task InitializeCoreAsync()
     {
         try
         {
-            Settings = await store.ReadAsync<WidgetSettings>("settings.bin", true, lifetime.Token) ?? new();
+            Settings = await store.ReadAsync<WidgetSettings>("settings.bin", true, lifetimeToken) ?? new();
+            if (Settings.Language is not ("system" or "ru" or "en")) Settings.Language = "system";
+            AppLocalization.Apply(Settings.Language);
             Settings.BackgroundOpacity = double.IsFinite(Settings.BackgroundOpacity) ? Math.Clamp(Settings.BackgroundOpacity, 0, .85) : .14;
             Settings.SyncMinutes = AutoSyncMinutes;
             if (!Enum.IsDefined(Settings.View)) Settings.View = CalendarView.Month;
             if (!Enum.IsDefined(Settings.Behavior)) Settings.Behavior = WindowBehavior.Normal;
             Settings.HiddenCalendars ??= [];
             Changed(""); AppearanceChanged?.Invoke();
-            Connected = await provider.IsConnectedAsync(lifetime.Token);
-            if (Connected) snapshot = await store.ReadAsync<CalendarSnapshot>("calendar-cache.bin", true, lifetime.Token) ?? snapshot;
+            Connected = await provider.IsConnectedAsync(lifetimeToken);
+            if (Connected)
+            {
+                var cached = await store.ReadAsync<CalendarSnapshot>("calendar-cache.bin", true, lifetimeToken);
+                if (cached is { Calendars: not null, Events: not null }) snapshot = cached;
+            }
             ReindexEvents();
             ApplyCalendars(); Rebuild();
             await RefreshAsync();
@@ -272,7 +314,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(AutoSyncMinutes));
         try
         {
-            while (await timer.WaitForNextTickAsync(lifetime.Token))
+            while (await timer.WaitForNextTickAsync(lifetimeToken))
             {
                 await RefreshAsync();
             }
@@ -281,7 +323,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     public async Task RefreshAsync()
     {
-        if (!Connected || !await syncGate.WaitAsync(0, lifetime.Token)) return;
+        if (disposed || lifetime.IsCancellationRequested || !Connected) return;
+        try { if (!await syncGate.WaitAsync(0, lifetimeToken)) return; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        int requestedYear = anchor.Year;
         Busy = true; Status = "Synchronizing calendars…";
         bool completed = false;
         try
@@ -289,34 +334,48 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             // Cache the displayed year and adjacent months for navigation and offline use.
             var start = new DateTime(anchor.Year, 1, 1).AddMonths(-1);
             var end = new DateTime(anchor.Year + 1, 1, 1).AddMonths(1);
-            var next = await provider.GetSnapshotAsync(CalendarTime.Midnight(start, CalendarTimeZoneId), CalendarTime.Midnight(end, CalendarTimeZoneId), lifetime.Token);
-            snapshot = next;
-            ReindexEvents();
-            await store.WriteAsync("calendar-cache.bin", snapshot, true, lifetime.Token);
-            ApplyCalendars(); Rebuild();
-            Status = $"Updated {snapshot.Updated:t}";
+            var next = await provider.GetSnapshotAsync(CalendarTime.Midnight(start, CalendarTimeZoneId), CalendarTime.Midnight(end, CalendarTimeZoneId), lifetimeToken);
+            bool contentChanged = !snapshot.Calendars.SequenceEqual(next.Calendars) || !snapshot.Events.SequenceEqual(next.Events)
+                || snapshot.RangeStart != next.RangeStart || snapshot.RangeEnd != next.RangeEnd;
+            snapshot = contentChanged ? next : snapshot with { Updated = next.Updated };
+            if (contentChanged)
+            {
+                var selected = SelectedEvent;
+                ApplyCalendars(); ReindexEvents(); Rebuild();
+                if (selected is { EventId.Length: > 0 })
+                    SelectedEvent = Days.SelectMany(d => d.Events).FirstOrDefault(e => e.EventId == selected.EventId && e.CalendarId == selected.CalendarId);
+                await store.WriteAsync("calendar-cache.bin", next, true, lifetimeToken);
+            }
+            Status = "";
             completed = true;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) { Status = "Calendar request timed out. Try again shortly."; }
         catch (CalendarAuthorizationException ex)
         {
             SelectedEvent = null; SettingsOpen = false; Connected = false;
             snapshot = new([], [], default); eventsByDay.Clear(); Calendars.Clear(); Rebuild();
-            await store.DeleteAsync("calendar-cache.bin");
-            Status = ex.Message;
+            Status = AppLocalization.Text(ex.Message);
+            try { await store.DeleteAsync("calendar-cache.bin"); }
+            catch (Exception cleanupError) when (cleanupError is System.IO.IOException or UnauthorizedAccessException)
+            {
+                Status += " " + AppLocalization.Text("Cached events could not be removed. Check file permissions.");
+            }
         }
         catch (Exception ex) { ReportError(ex); }
         finally { Busy = false; syncGate.Release(); }
-        if (completed && !lifetime.IsCancellationRequested) await RefreshIfNeededAsync();
+        if (completed && !lifetime.IsCancellationRequested && requestedYear != anchor.Year) await RefreshAsync();
     }
     private void ApplyCalendars()
     {
+        if (Calendars.Select(c => c.Calendar).SequenceEqual(snapshot.Calendars)) return;
         string selected = Settings.TimeZoneCalendarId;
         Calendars.Clear();
         foreach (var calendar in snapshot.Calendars)
             Calendars.Add(new(calendar, !Settings.HiddenCalendars.Contains(calendar.Id), () => { Settings.HiddenCalendars = Calendars.Where(c => !c.Visible).Select(c => c.Calendar.Id).ToList(); Rebuild(); _ = SaveSafelyAsync(); }));
         Settings.TimeZoneCalendarId = snapshot.Calendars.Any(c => c.Id == selected) ? selected : (snapshot.Calendars.FirstOrDefault(c => c.IsPrimary) ?? snapshot.Calendars.FirstOrDefault())?.Id ?? "";
-        Changed(nameof(TimeZoneCalendarId)); UpdateTimeZone();
+        Changed(nameof(TimeZoneCalendarId)); Changed(nameof(CalendarTimeZoneId)); Changed(nameof(CalendarTimeZoneLabel));
+        if (followToday) anchor = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
     }
     private Task RefreshIfNeededAsync()
     {
@@ -338,21 +397,24 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             {
                 var start = CalendarTime.Local(e.Start, CalendarTimeZoneId);
                 var end = CalendarTime.Local(e.End, CalendarTimeZoneId);
-                string time = e.AllDay ? "All day" : $"{start:t} – {end:t}";
+                string time = e.AllDay ? AppLocalization.Text("All day") : $"{start.ToString("t", AppLocalization.Culture)} – {end.ToString("t", AppLocalization.Culture)}";
                 double startMinute = start.Date < day ? 0 : start.TimeOfDay.TotalMinutes;
                 double endMinute = end.Date > day ? 1440 : end.TimeOfDay.TotalMinutes;
                 if (!e.AllDay && endMinute <= startMinute && e.End > e.Start) endMinute = Math.Min(1440, startMinute + (e.End - e.Start).TotalMinutes);
-                string description = EventText.ToPlainText(e.Description);
+                if (!descriptions.TryGetValue(e, out string? description))
+                    descriptions[e] = description = EventText.ToPlainText(e.Description);
+                string preview = description.Length > 400 ? description[..400] + "…" : description;
                 DateTime first = e.AllDay ? e.Start.Date : start.Date;
                 DateTime last = e.AllDay ? e.End.Date.AddDays(-1) : end.Date;
-                string dateLabel = first == last ? first.ToString("D") : $"{first:D} – {last:D}";
-                return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{description}".Trim(), e.AllDay,
-                    startMinute, endMinute, description, e.Location, snapshot.Calendars.FirstOrDefault(c => c.Id == e.CalendarId)?.Name ?? "", dateLabel, CalendarTimeZoneLabel);
+                string dateLabel = first == last ? first.ToString("D", AppLocalization.Culture) : $"{first.ToString("D", AppLocalization.Culture)} – {last.ToString("D", AppLocalization.Culture)}";
+                return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{preview}".Trim(), e.AllDay,
+                    startMinute, endMinute, description, e.Location, snapshot.Calendars.FirstOrDefault(c => c.Id == e.CalendarId)?.Name ?? "", dateLabel, CalendarTimeZoneLabel, e.Id, e.CalendarId);
             }).ToList();
         return new(day, day.Month == month, day == CalendarTime.Local(currentTime, CalendarTimeZoneId).Date, events);
     }
     private void ReindexEvents()
     {
+        descriptions.Clear();
         eventsByDay.Clear();
         foreach (var item in snapshot.Events)
         {
@@ -374,16 +436,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     private void Rebuild()
     {
-        Changed(nameof(Period)); Changed(nameof(IsYear)); Changed(nameof(IsMonth)); Changed(nameof(IsDays)); Changed(nameof(Columns));
+        Changed(nameof(HeaderMonth)); Changed(nameof(HeaderYear)); Changed(nameof(Period)); Changed(nameof(IsYear)); Changed(nameof(IsMonth)); Changed(nameof(IsDays)); Changed(nameof(Columns));
         Changed(nameof(DayHeading)); Changed(nameof(IsWeekendHeading)); Changed(nameof(IsSingleDay)); UpdateClockSchedule();
         Days.Clear(); Months.Clear(); Quarters.Clear();
         if (IsYear)
         {
-            for (int i = 1; i <= 12; i++) { var month = new DateTime(anchor.Year, i, 1); Months.Add(new(month.ToString("MMMM"), MonthDays(month))); }
+            for (int i = 1; i <= 12; i++) { var month = new DateTime(anchor.Year, i, 1); Months.Add(new(month.ToString("MMMM", AppLocalization.Culture), MonthDays(month))); }
             for (int q = 0; q < 4; q++)
             {
                 var first = new DateTime(anchor.Year, q * 3 + 1, 1);
-                Quarters.Add(new($"Q{q + 1}", $"{first:MMM} – {first.AddMonths(2):MMM}", Months.Skip(q * 3).Take(3).ToList()));
+                Quarters.Add(new(string.Format(AppLocalization.Culture, AppLocalization.Text("Quarter"), q + 1), $"{first.ToString("MMM", AppLocalization.Culture)} – {first.AddMonths(2).ToString("MMM", AppLocalization.Culture)}", Months.Skip(q * 3).Take(3).ToList()));
             }
         }
         else if (IsMonth) foreach (var day in MonthDays(anchor)) Days.Add(day);
@@ -392,19 +454,50 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             DateTime start = View is CalendarView.Workweek or CalendarView.Week ? Monday(anchor) : anchor.Date;
             for (int i = 0; i < Columns; i++) Days.Add(Cell(start.AddDays(i), start.Month));
         }
+        Changed(nameof(ShouldShowToday));
     }
     public Task SaveAsync() => store.WriteAsync("settings.bin", Settings, true);
-    private async Task SaveSafelyAsync() { try { await SaveAsync(); } catch (Exception ex) { ReportError(ex); } }
-    public void ReportError(Exception ex) => Status = ex is OperationCanceledException ? "Authorization timed out or was cancelled." : $"{ex.Message} {(snapshot.Updated != default ? "Showing cached events." : "")}";
-    public async Task ShutdownAsync()
+    private async Task SaveSafelyAsync()
     {
+        if (disposed || lifetimeToken.IsCancellationRequested) return;
+        var pending = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
+        var previous = saveDebounce;
+        saveDebounce = pending;
+        previous?.Cancel();
+        try { await Task.Delay(250, pending.Token); await SaveAsync(); }
+        catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
+        catch (Exception ex) { ReportError(ex); }
+        finally
+        {
+            if (ReferenceEquals(saveDebounce, pending)) saveDebounce = null;
+            pending.Dispose();
+        }
+    }
+    public void ReportError(Exception ex)
+    {
+        if (disposed || lifetimeToken.IsCancellationRequested) return;
+        Status = ex is OperationCanceledException ? AppLocalization.Text("Authorization timed out or was cancelled.")
+            : $"{AppLocalization.Text(ex.Message)} {(snapshot.Updated != default ? AppLocalization.Text("Showing cached events.") : "")}";
+    }
+    public Task ShutdownAsync() => shutdownTask ??= ShutdownCoreAsync();
+    private async Task ShutdownCoreAsync()
+    {
+        if (disposed) return;
         minuteTimer.Stop();
         secondTimer.Stop();
         lifetime.Cancel();
+        if (initializationTask is not null) await initializationTask;
         if (refreshLoop is not null) await refreshLoop;
         await syncGate.WaitAsync();
         try { await SaveAsync(); }
         finally { syncGate.Release(); }
     }
-    public void Dispose() { minuteTimer.Stop(); secondTimer.Stop(); lifetime.Cancel(); provider.Dispose(); lifetime.Dispose(); }
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        minuteTimer.Stop(); secondTimer.Stop(); lifetime.Cancel(); provider.Dispose();
+        AppearanceChanged = null; FitDesktopRequested = null;
+        lifetime.Dispose();
+    }
 }
