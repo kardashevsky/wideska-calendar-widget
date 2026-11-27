@@ -45,7 +45,14 @@ public sealed class DayTimeline : Control
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> hits = [];
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> headerHits = [];
     private ScrollViewer? scrollOwner;
-    private double? pendingWheelOffset;
+    private const double WheelDistance = 72;
+    private const double ScrollDurationSeconds = .17;
+    private readonly System.Diagnostics.Stopwatch scrollAnimationClock = new();
+    private double scrollStartOffset;
+    private double scrollTargetOffset;
+    private double expectedScrollOffset;
+    private int wheelDirection;
+    internal bool IsScrollAnimating => scrollAnimationClock.IsRunning;
     private double headerHeight;
     private bool drawingHeader;
     private INotifyCollectionChanged? observed;
@@ -96,18 +103,29 @@ public sealed class DayTimeline : Control
         PreviewMouseWheel += (_, e) =>
         {
             if (scrollOwner is null || e.Delta == 0 || headerHeight <= 0) return;
-            double halfHourHeight = (ActualHeight - headerHeight - TimelineBottomPadding) / 48;
-            if (halfHourHeight <= 0) return;
-            double offset = pendingWheelOffset ?? scrollOwner.VerticalOffset;
-            pendingWheelOffset = Math.Clamp(offset - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * halfHourHeight,
+            int direction = Math.Sign(e.Delta);
+            double offset = IsScrollAnimating && wheelDirection == direction ? scrollTargetOffset : scrollOwner.VerticalOffset;
+            scrollTargetOffset = Math.Clamp(offset - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * WheelDistance,
                 0, scrollOwner.ScrollableHeight);
-            scrollOwner.ScrollToVerticalOffset(pendingWheelOffset.Value);
+            scrollStartOffset = expectedScrollOffset = scrollOwner.VerticalOffset;
+            wheelDirection = direction;
+            if (!SystemParameters.ClientAreaAnimation)
+            {
+                StopScrollAnimation();
+                scrollOwner.ScrollToVerticalOffset(scrollTargetOffset);
+            }
+            else
+            {
+                if (!IsScrollAnimating) CompositionTarget.Rendering += OnScrollFrame;
+                scrollAnimationClock.Restart();
+            }
             e.Handled = true;
         };
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         Loaded += (_, _) => { Observe(); ConnectScrollOwner(); ScheduleScroll(); };
-        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
-        Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged; scrollOwner = null; };
+        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else { StopScrollAnimation(); ClearHover(); } };
+        Unloaded += (_, _) => { StopScrollAnimation(); ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged; scrollOwner = null; };
+        PreviewMouseLeftButtonDown += (_, _) => StopScrollAnimation();
         MouseLeave += (_, _) => { Cursor = Cursors.Arrow; ClearHover(); };
         MouseMove += (_, e) =>
         {
@@ -124,6 +142,20 @@ public sealed class DayTimeline : Control
         if (hover is not null) InvalidateVisual();
         eventToolTip.IsOpen = false; eventToolTip.Content = null;
         ToolTip = null; hover = null;
+    }
+    private void StopScrollAnimation()
+    {
+        CompositionTarget.Rendering -= OnScrollFrame;
+        scrollAnimationClock.Reset();
+    }
+    private void OnScrollFrame(object? sender, EventArgs e)
+    {
+        if (scrollOwner is null || !IsVisible) { StopScrollAnimation(); return; }
+        double progress = Math.Clamp(scrollAnimationClock.Elapsed.TotalSeconds / ScrollDurationSeconds, 0, 1);
+        double eased = 1 - Math.Pow(1 - progress, 3);
+        expectedScrollOffset = Math.Clamp(scrollStartOffset + (scrollTargetOffset - scrollStartOffset) * eased, 0, scrollOwner.ScrollableHeight);
+        scrollOwner.ScrollToVerticalOffset(expectedScrollOffset);
+        if (progress >= 1) StopScrollAnimation();
     }
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
@@ -144,7 +176,7 @@ public sealed class DayTimeline : Control
     public EventItem? EventAt(Point position) => ItemAt(position).Event;
     private void ConnectScrollOwner()
     {
-        pendingWheelOffset = null;
+        StopScrollAnimation();
         if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged;
         DependencyObject? parent = VisualTreeHelper.GetParent(this);
         while (parent is not null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
@@ -154,7 +186,8 @@ public sealed class DayTimeline : Control
     }
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        pendingWheelOffset = null;
+        if (IsScrollAnimating && ((e.VerticalChange != 0 && Math.Abs(e.VerticalOffset - expectedScrollOffset) > 1)
+            || e.ViewportHeightChange != 0 || e.ExtentHeightChange != 0)) StopScrollAnimation();
         if (e.VerticalChange == 0 && e.HorizontalChange == 0 && e.ViewportHeightChange == 0 && e.ViewportWidthChange == 0) return;
         ClearHover(); UpdateHeaderPosition();
         if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
@@ -173,7 +206,12 @@ public sealed class DayTimeline : Control
         timeBadge.Clip = new RectangleGeometry(new Rect(0, offset + headerHeight, ActualWidth, Math.Max(0, ActualHeight - offset - headerHeight)));
         ViewportChanged?.Invoke();
     }
-    private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((DayTimeline)d).Observe();
+    private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var timeline = (DayTimeline)d;
+        timeline.StopScrollAnimation();
+        timeline.Observe();
+    }
     private void Observe()
     {
         if (observed is not null) observed.CollectionChanged -= CollectionChanged;

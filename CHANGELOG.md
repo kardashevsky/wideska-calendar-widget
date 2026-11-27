@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Scroll the day timeline by half an hour per wheel detent, immediately and without delayed snapping.
+- Use fast frame-driven wheel scrolling with a 170 ms ease-out, immediate direction changes and no delayed snapping.
+- Stop scroll rendering callbacks when idle, hidden or unloaded, and respect Windows animation preferences.
 - Use zero-padded 24-hour event times in both interface languages.
 - Remove delayed half-hour snapping that caused a second movement after wheel scrolling.
 
