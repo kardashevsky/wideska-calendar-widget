@@ -172,8 +172,8 @@
         <Button Style="{StaticResource EventCardButton}" Command="{Binding DataContext.OpenEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
         <Grid Margin="0,4" ToolTip="{Binding Details}" TextElement.Foreground="{Binding Color, Converter={StaticResource EventColor}, ConverterParameter=Text}">
             <Border Background="{Binding Color, Converter={StaticResource EventColor}}" CornerRadius="10"/>
-            <Border BorderBrush="{Binding Color}" BorderThickness="2,0,0,0" Padding="10,8" Margin="0,4">
-                <StackPanel><TextBlock Text="{Binding Time}" FontSize="10" Margin="0,0,0,3"/><controls:EventTitle Text="{Binding Title}" FontSize="13" FontWeight="Medium" MaxHeight="64" HorizontalAlignment="Stretch"/></StackPanel>
+            <Border Padding="10,8" Margin="0,4">
+                <StackPanel><controls:EventTitle Text="{Binding Title}" FontSize="13" FontWeight="Medium" MaxHeight="64" HorizontalAlignment="Stretch"/><TextBlock Text="{Binding Time}" FontSize="12" FontWeight="Medium" Margin="0,4,0,0"/></StackPanel>
             </Border>
         </Grid>
         </Button>
@@ -182,7 +182,7 @@
         <Button Style="{StaticResource EventCardButton}" Command="{Binding DataContext.OpenEventCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
         <Grid Margin="1,2" ToolTip="{Binding Details}" TextElement.Foreground="{Binding Color, Converter={StaticResource EventColor}, ConverterParameter=Text}">
             <Border Background="{Binding Color, Converter={StaticResource EventColor}}" CornerRadius="4"/>
-            <Border BorderBrush="{Binding Color}" BorderThickness="2,0,0,0" Padding="5,3">
+            <Border Padding="5,3">
                 <controls:EventTitle Text="{Binding Title}" FontSize="11" MaxHeight="40" HorizontalAlignment="Stretch"/>
             </Border>
         </Grid>
