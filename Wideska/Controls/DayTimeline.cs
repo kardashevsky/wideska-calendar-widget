@@ -301,21 +301,22 @@ public sealed class DayTimeline : Control
         }
         else
         {
-            // Keep the strong calendar-color accent inside the side of the card.
-            if (rect.Height > 20)
-                dc.DrawRoundedRectangle(textBrush, null, new Rect(rect.X + 4, rect.Y + 9, 3, Math.Max(2, rect.Height - 18)), 1.5, 1.5);
             string start = TimeSpan.FromMinutes(Math.Clamp(item.StartMinute, 0, 1440)).ToString(@"hh\:mm");
-            if (rect.Height >= 46)
+            double width = Math.Max(0, rect.Width - 20);
+            if (rect.Height >= 36 && width >= 2)
             {
+                double top = rect.Height >= 46 ? 7 : 3;
+                double titleHeight = Math.Max(12, rect.Height - top - 24);
+                var title = EventTitle.Fit(item.Title, new Typeface(FontFamily, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal),
+                    textBrush, width, titleHeight, 13, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + top, width, titleHeight), 13, textBrush, FontWeights.Medium);
+                double timeY = rect.Y + top + Math.Min(title.Height, titleHeight) + 3;
                 string time = string.IsNullOrEmpty(item.Time) ? start : item.Time;
-                Text(dc, time, rect.X + 14, rect.Y + 8, rect.Width - 24, 10, textBrush, FontWeights.Medium);
-                Title(dc, item.Title, new Rect(rect.X + 14, rect.Y + 24, Math.Max(0, rect.Width - 24), Math.Max(0, rect.Height - 30)), 13, textBrush, FontWeights.Medium);
+                Text(dc, time, rect.X + 10, timeY, width, 12, textBrush, FontWeights.Medium);
             }
             else if (rect.Height >= 20)
             {
-                double badgeWidth = Math.Min(39, rect.Width * .4);
-                Text(dc, start, rect.X + 12, rect.Y + 5, badgeWidth, 10, textBrush, FontWeights.Medium);
-                Title(dc, item.Title, new Rect(rect.X + badgeWidth + 17, rect.Y + 3, Math.Max(0, rect.Width - badgeWidth - 24), Math.Max(0, rect.Height - 6)), 11, textBrush, FontWeights.Medium);
+                Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + 3, width, Math.Max(0, rect.Height - 6)), 11, textBrush, FontWeights.Medium);
             }
         }
         dc.Pop(); (drawingHeader ? headerHits : hits).Add((rect, item.Details, item));
