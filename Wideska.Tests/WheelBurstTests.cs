@@ -20,6 +20,10 @@ internal static partial class Program
         Thread.Sleep(25);
         typeof(DayTimeline).GetMethod("OnScrollFrame", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(timeline, [null, EventArgs.Empty]);
+        var presenter = (System.Windows.Controls.Primitives.IScrollInfo)viewer.Template.FindName("PART_ScrollContentPresenter", viewer);
+        viewer.UpdateLayout();
+        Check(presenter.VerticalOffset > 200,
+            "A render frame must update the scroll presenter before the dispatcher processes queued viewer commands");
         Wheel(-120);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(timeline.IsScrollAnimating, "The fifth wheel input must not cancel a pending animation frame");
@@ -42,6 +46,29 @@ internal static partial class Program
             Check(!timeline.IsScrollAnimating && Math.Abs(viewer.VerticalOffset - target) < .5,
                 "Long wheel bursts must settle at their full target in both directions");
         }
+        viewer.ScrollToVerticalOffset(originalOffset);
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        ScrollChangedEventArgs? delayedAcknowledgement = null;
+        void CaptureAcknowledgement(object sender, ScrollChangedEventArgs e) { if (e.VerticalChange != 0) delayedAcknowledgement = e; }
+        viewer.ScrollChanged += CaptureAcknowledgement;
+        viewer.ScrollToVerticalOffset(originalOffset + 2);
+        await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        viewer.ScrollChanged -= CaptureAcknowledgement;
+        Wheel(-120);
+        await Task.Delay(35);
+        typeof(DayTimeline).GetMethod("OnScrollChanged", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(timeline, [viewer, delayedAcknowledgement!]);
+        Check(timeline.IsScrollAnimating, "Delayed offset acknowledgements must not be mistaken for manual scrollbar input");
+        await Task.Delay(450);
+        Wheel(-120);
+        viewer.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(viewer), Environment.TickCount, Key.PageDown)
+            { RoutedEvent = UIElement.PreviewKeyDownEvent });
+        Check(!timeline.IsScrollAnimating, "Keyboard scrolling must explicitly take control from the wheel animation");
+        Wheel(-120);
+        var scrollbar = (System.Windows.Controls.Primitives.ScrollBar)viewer.Template.FindName("PART_VerticalScrollBar", viewer);
+        scrollbar.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+            { RoutedEvent = UIElement.PreviewMouseDownEvent, Handled = true });
+        Check(!timeline.IsScrollAnimating, "Scrollbar pointer input must cancel animation even when its event is handled by the control");
         viewer.ScrollToVerticalOffset(originalOffset);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
     }

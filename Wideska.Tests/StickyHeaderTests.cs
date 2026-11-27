@@ -107,6 +107,8 @@ internal static partial class Program
             "Reversing direction must immediately discard the previous forward target");
         timeline.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
             { RoutedEvent = UIElement.PreviewMouseWheelEvent });
+        var verticalBar = (System.Windows.Controls.Primitives.ScrollBar)viewer.Template.FindName("PART_VerticalScrollBar", viewer);
+        verticalBar.RaiseEvent(new System.Windows.Controls.Primitives.ScrollEventArgs(System.Windows.Controls.Primitives.ScrollEventType.ThumbTrack, 500));
         viewer.ScrollToVerticalOffset(500);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         await Task.Delay(240);
