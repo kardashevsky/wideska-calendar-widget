@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Apply animated offsets directly through the physical scroll presenter instead of queuing a command per frame.
+- Cancel wheel animation on actual scrollbar, pointer or keyboard input rather than guessing from delayed offset notifications; detach all input handlers on unload.
 - Keep wheel bursts smooth when input arrives before WPF applies a queued animation frame; do not mistake that frame for manual scrollbar input.
 - Animate Show Today with the same directional carousel used by period navigation, including horizontally hidden day columns.
 - Use continuous frame-driven wheel scrolling that preserves velocity across repeated wheel input, with no delayed snapping or overshoot.
