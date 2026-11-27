@@ -41,31 +41,36 @@ public sealed class DayTimeline : Control
     public string TimeZoneId { get => (string)GetValue(TimeZoneIdProperty); set => SetValue(TimeZoneIdProperty, value); }
     public Brush GridBrush { get => (Brush)GetValue(GridBrushProperty); set => SetValue(GridBrushProperty, value); }
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> hits = [];
+    private readonly List<(Rect Bounds, string Details, EventItem? Event)> headerHits = [];
+    private ScrollViewer? scrollOwner;
+    private double headerHeight;
+    private bool drawingHeader;
     private INotifyCollectionChanged? observed;
     private string? hover;
     private readonly ToolTip eventToolTip = new();
     private bool scrollPending;
-    private Rect slotArea = Rect.Empty;
     private readonly DrawingVisual timeBadge = new();
+    private readonly DrawingVisual stickyHeader = new();
     private double badgeY = double.NaN;
-    protected override int VisualChildrenCount => 1;
-    protected override Visual GetVisualChild(int index) => index == 0 ? timeBadge : throw new ArgumentOutOfRangeException(nameof(index));
+    protected override int VisualChildrenCount => 2;
+    protected override Visual GetVisualChild(int index) => index switch { 0 => timeBadge, 1 => stickyHeader, _ => throw new ArgumentOutOfRangeException(nameof(index)) };
     protected override Size MeasureOverride(Size availableSize) => new(double.IsFinite(availableSize.Width) ? availableSize.Width : MinWidth, MinimumTimelineHeight);
     protected override Size ArrangeOverride(Size finalSize) => finalSize;
     public DayTimeline()
     {
         AddVisualChild(timeBadge);
+        AddVisualChild(stickyHeader);
         MinHeight = MinimumTimelineHeight;
         SnapsToDevicePixels = true; UseLayoutRounding = true;
-        Loaded += (_, _) => { Observe(); ScheduleScroll(); };
+        Loaded += (_, _) => { Observe(); ConnectScrollOwner(); ScheduleScroll(); };
         IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
-        Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; };
+        Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged; scrollOwner = null; };
         MouseLeave += (_, _) => { Cursor = Cursors.Arrow; ClearHover(); };
         MouseMove += (_, e) =>
         {
-            Point position = e.GetPosition(this);
-            Cursor = slotArea.Contains(position) ? Cursors.Hand : Cursors.Arrow;
-            string? details = hits.LastOrDefault(h => h.Bounds.Contains(position)).Details;
+            var hit = ItemAt(e.GetPosition(this));
+            Cursor = hit.Event is not null ? Cursors.Hand : Cursors.Arrow;
+            string? details = hit.Details;
             if (details == hover) return;
             if (details is null) { ClearHover(); return; }
             hover = details; eventToolTip.Content = details; ToolTip = eventToolTip; InvalidateVisual();
@@ -79,12 +84,41 @@ public sealed class DayTimeline : Control
     }
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
-        var item = hits.LastOrDefault(h => h.Bounds.Contains(e.GetPosition(this))).Event;
+        var item = ItemAt(e.GetPosition(this)).Event;
         if (item is not null && EventCommand?.CanExecute(item) == true)
         {
             ClearHover(); EventCommand.Execute(item); e.Handled = true;
         }
         base.OnMouseLeftButtonUp(e);
+    }
+    private (Rect Bounds, string Details, EventItem? Event) ItemAt(Point position)
+    {
+        double offset = scrollOwner?.VerticalOffset ?? 0;
+        if (position.Y >= offset && position.Y < offset + headerHeight)
+            return headerHits.LastOrDefault(h => h.Bounds.Contains(new Point(position.X, position.Y - offset)));
+        return hits.LastOrDefault(h => h.Bounds.Contains(position));
+    }
+    public EventItem? EventAt(Point position) => ItemAt(position).Event;
+    private void ConnectScrollOwner()
+    {
+        if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged;
+        DependencyObject? parent = VisualTreeHelper.GetParent(this);
+        while (parent is not null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
+        scrollOwner = parent as ScrollViewer;
+        if (scrollOwner is not null) scrollOwner.ScrollChanged += OnScrollChanged;
+        UpdateHeaderPosition();
+    }
+    private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.VerticalChange == 0 && e.HorizontalChange == 0) return;
+        ClearHover(); UpdateHeaderPosition();
+        if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
+    }
+    private void UpdateHeaderPosition()
+    {
+        double offset = scrollOwner?.VerticalOffset ?? 0;
+        stickyHeader.Transform = new TranslateTransform(0, offset);
+        timeBadge.Clip = new RectangleGeometry(new Rect(0, offset + headerHeight, ActualWidth, Math.Max(0, ActualHeight - offset - headerHeight)));
     }
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((DayTimeline)d).Observe();
     private void Observe()
@@ -109,7 +143,8 @@ public sealed class DayTimeline : Control
             if (parent is not ScrollViewer viewer) return;
             var local = CalendarTime.Local(CurrentTime, TimeZoneId);
             double header = TimeStart(days);
-            viewer.ScrollToVerticalOffset(Math.Max(0, header + local.TimeOfDay.TotalMinutes / 1440 * (ActualHeight - header - 12) - viewer.ViewportHeight / 3));
+            double bodyViewport = Math.Max(0, viewer.ViewportHeight - header);
+            viewer.ScrollToVerticalOffset(Math.Max(0, local.TimeOfDay.TotalMinutes / 1440 * (ActualHeight - header - 16) - bodyViewport / 3));
         });
     }
     public const double MinimumTimelineHeight = 1480;
@@ -128,21 +163,25 @@ public sealed class DayTimeline : Control
     }
     protected override void OnRender(DrawingContext dc)
     {
-        base.OnRender(dc); hits.Clear(); slotArea = Rect.Empty; badgeY = double.NaN;
+        base.OnRender(dc); hits.Clear(); headerHits.Clear(); badgeY = double.NaN;
         var days = Days?.ToList() ?? [];
-        if (days.Count == 0 || ActualWidth <= TimeGutterWidth) { RenderTimeBadge(); return; }
+        if (days.Count == 0 || ActualWidth <= TimeGutterWidth) { RenderTimeBadge(); using var empty = stickyHeader.RenderOpen(); return; }
         double column = (ActualWidth - TimeGutterWidth) / days.Count;
         int allDayRows = Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay)));
         double startY = TimeStart(days);
         double timelineHeight = Math.Max(24, ActualHeight - startY - 16);
-        slotArea = new Rect(TimeGutterWidth, startY, ActualWidth - TimeGutterWidth, timelineHeight);
+        headerHeight = startY;
         int today = days.FindIndex(d => CalendarTime.IndicatorMinutes(d.Date, CurrentTime, TimeZoneId) is not null);
         double? nowMinutes = today < 0 ? null : CalendarTime.IndicatorMinutes(days[today].Date, CurrentTime, TimeZoneId);
         double nowY = nowMinutes is null ? -100 : startY + nowMinutes.Value / 1440 * timelineHeight;
         double axisX = TimeGutterWidth - 12;
         var gridPen = new Pen(GridBrush, 1);
-        Text(dc, "TIME", 8, 17, TimeGutterWidth - 16, 9, MutedBrush, FontWeights.SemiBold);
-        if (allDayRows > 0) Text(dc, "ALL DAY", 6, DayHeaderHeight + 7, TimeGutterWidth - 14, 9, MutedBrush, FontWeights.Medium);
+        if (days.Count > 1 && today >= 0)
+        {
+            dc.PushOpacity(.06);
+            dc.DrawRectangle(AccentBrush, null, new Rect(TimeGutterWidth + today * column, startY, column, timelineHeight));
+            dc.Pop();
+        }
         // One-hour slots: alternate subtle bands and align the labels to their boundaries.
         for (int hour = 0; hour < 24; hour++)
         {
@@ -166,19 +205,7 @@ public sealed class DayTimeline : Control
         for (int index = 0; index < days.Count; index++)
         {
             var day = days[index]; double x = TimeGutterWidth + index * column;
-            hits.Add((new Rect(x, 0, column, startY), day.Summary, null));
-            if (index == today)
-            {
-                dc.PushOpacity(.1); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 6, 4, Math.Max(1, column - 12), 34), 10, 10); dc.Pop();
-                Text(dc, day.Label, x + 16, 12, column - 28, 13, day.IsWeekend ? WeekendBrush : AccentBrush, FontWeights.SemiBold);
-            }
-            else Text(dc, day.Label, x + 14, 12, column - 24, 13, day.IsWeekend ? WeekendBrush : Foreground, FontWeights.Medium);
-            dc.DrawLine(gridPen, new Point(x, DayHeaderHeight), new Point(x, ActualHeight - 16));
-            int row = 0;
-            foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))
-                Event(dc, item, new Rect(x + 8, DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - 16), 24), false);
-            if (day.Events.Count(e => e.AllDay) > allDayRows)
-                Text(dc, "More all-day events", x + 12, startY - 18, column - 24, 10, MutedBrush);
+            dc.DrawLine(gridPen, new Point(x, startY), new Point(x, ActualHeight - 16));
             foreach (var item in TimelineLayout.Arrange(day.Events))
             {
                 double laneWidth = Math.Max(1, (column - 16) / item.LaneCount);
@@ -198,6 +225,39 @@ public sealed class DayTimeline : Control
             dc.DrawEllipse(NowBrush, null, new Point(x + 4, nowY), 4, 4);
         }
         RenderTimeBadge();
+        RenderHeader(days, column, today, allDayRows);
+        UpdateHeaderPosition();
+    }
+    private void RenderHeader(IReadOnlyList<DayCell> days, double column, int today, int allDayRows)
+    {
+        using var dc = stickyHeader.RenderOpen();
+        Brush background = SurfaceBrush;
+        if (SurfaceBrush is SolidColorBrush solid) background = new SolidColorBrush(Color.FromRgb(solid.Color.R, solid.Color.G, solid.Color.B));
+        dc.DrawRectangle(background, null, new Rect(0, 0, ActualWidth, headerHeight));
+        Text(dc, "TIME", 8, 17, TimeGutterWidth - 16, 9, MutedBrush, FontWeights.SemiBold);
+        if (allDayRows > 0) Text(dc, "ALL DAY", 6, DayHeaderHeight + 7, TimeGutterWidth - 14, 9, MutedBrush, FontWeights.Medium);
+        drawingHeader = true;
+        try
+        {
+            for (int index = 0; index < days.Count; index++)
+            {
+                var day = days[index]; double x = TimeGutterWidth + index * column;
+                headerHits.Add((new Rect(x, 0, column, headerHeight), day.Summary, null));
+                if (index == today)
+                {
+                    dc.PushOpacity(.12); dc.DrawRoundedRectangle(AccentBrush, null, new Rect(x + 6, 4, Math.Max(1, column - 12), 34), 10, 10); dc.Pop();
+                    dc.DrawLine(new Pen(AccentBrush, 2), new Point(x + 8, headerHeight - 1), new Point(x + column - 8, headerHeight - 1));
+                }
+                Brush label = day.IsWeekend ? WeekendBrush : index == today ? AccentBrush : Foreground;
+                Text(dc, day.Label, x + 14, 12, column - 24, 13, label, index == today ? FontWeights.SemiBold : FontWeights.Medium);
+                int row = 0;
+                foreach (var item in day.Events.Where(e => e.AllDay).Take(allDayRows))
+                    Event(dc, item, new Rect(x + 8, DayHeaderHeight + AllDayRowHeight * row++, Math.Max(1, column - 16), 24), false);
+                if (day.Events.Count(e => e.AllDay) > allDayRows) Text(dc, "More all-day events", x + 12, headerHeight - 18, column - 24, 10, MutedBrush);
+            }
+        }
+        finally { drawingHeader = false; }
+        dc.DrawLine(new Pen(GridBrush, 1), new Point(0, headerHeight - .5), new Point(ActualWidth, headerHeight - .5));
     }
     private void RenderTimeBadge()
     {
@@ -245,6 +305,6 @@ public sealed class DayTimeline : Control
                 Text(dc, item.Title, rect.X + badgeWidth + 17, rect.Y + 4, rect.Width - badgeWidth - 24, 11, Foreground, FontWeights.Medium);
             }
         }
-        dc.Pop(); hits.Add((rect, item.Details, item));
+        dc.Pop(); (drawingHeader ? headerHits : hits).Add((rect, item.Details, item));
     }
 }
