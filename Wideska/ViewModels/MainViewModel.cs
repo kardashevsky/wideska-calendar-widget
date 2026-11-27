@@ -18,6 +18,7 @@ public sealed class CalendarSelection(CalendarInfo calendar, bool visible, Actio
 public sealed record EventItem(string Title, string Time, string Color, string Details, bool AllDay = false, double StartMinute = 0, double EndMinute = 0,
     string Description = "", string Location = "", string CalendarName = "", string DateLabel = "", string TimeZoneLabel = "")
 {
+    public bool IsSleepCalendar => string.Equals(CalendarName.Trim(), "Sleep", StringComparison.OrdinalIgnoreCase) || string.Equals(CalendarName.Trim(), "Сон", StringComparison.OrdinalIgnoreCase);
     public bool HasLocation => !string.IsNullOrWhiteSpace(Location);
     public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
 }

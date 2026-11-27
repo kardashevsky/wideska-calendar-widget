@@ -284,15 +284,15 @@ public sealed class DayTimeline : Control
     }
     private void Event(DrawingContext dc, EventItem item, Rect rect, bool timed)
     {
-        var fill = Wideska.Converters.EventColorConverter.VibrantColor(item.Color);
+        var fill = Wideska.Converters.EventColorConverter.CardColor(item);
         Brush color = new SolidColorBrush(fill);
-        Brush textBrush = Wideska.Converters.EventColorConverter.TextBrush(fill);
+        Brush textBrush = Wideska.Converters.EventColorConverter.CardTextBrush(item);
         bool highlighted = item.Details == hover;
         double radius = timed ? Math.Min(8, rect.Height / 2) : 5;
         var shape = new RectangleGeometry(rect, radius, radius);
         dc.PushClip(shape);
         dc.DrawRoundedRectangle(color, null, rect, radius, radius);
-        dc.PushOpacity(highlighted ? .75 : .3);
+        dc.PushOpacity(item.IsSleepCalendar ? (highlighted ? .3 : .1) : (highlighted ? .75 : .3));
         dc.DrawRoundedRectangle(null, new Pen(textBrush, highlighted ? 1.5 : 1), rect, radius, radius); dc.Pop();
         if (!timed)
         {
