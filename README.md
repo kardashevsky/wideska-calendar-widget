@@ -38,7 +38,7 @@ dotnet build Wideska/Wideska.slnx -c Release --artifacts-path artifacts/build
 .\artifacts\build\bin\Wideska\release\Wideska.exe
 ```
 
-Synchronization runs silently in the background without status text, progress indicators or layout changes.
+Synchronization runs silently in the background without status text, progress indicators or layout changes. Requests are scheduled at wall-clock minute boundaries (`HH:mm:00`), using the same timer as the minute indicator. Slow requests do not overlap; network response arrival is not a real-time guarantee.
 
 ## Widget heading
 

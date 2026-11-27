@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Enable Windows sign-in startup by default for new installations; existing explicit preferences remain configurable.
+- Align calendar refresh requests and the minute indicator to wall-clock minute boundaries, without accumulated timer drift.
+- Remove the separate periodic synchronization timer and retain cancellation and non-overlapping requests.
+
 ## 0.1.0
 
 First downloadable Windows x64 release of Wideska.
