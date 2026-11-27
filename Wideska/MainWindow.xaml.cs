@@ -150,6 +150,11 @@ public partial class MainWindow : Window
     }
     private void OnOpenGoogleCloud(object sender, RoutedEventArgs e) => OpenLink("https://console.cloud.google.com/apis/library/calendar-json.googleapis.com");
     private void OnOpenGoogleGuide(object sender, RoutedEventArgs e) => OpenLink("https://developers.google.com/workspace/calendar/api/quickstart/python#authorize_credentials_for_a_desktop_application");
+    private void OnDescriptionLink(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        if (e.Uri.IsAbsoluteUri && e.Uri.Scheme is "http" or "https" or "mailto") OpenLink(e.Uri.AbsoluteUri);
+        e.Handled = true;
+    }
     private void OpenLink(string address)
     {
         try { Process.Start(new ProcessStartInfo(address) { UseShellExecute = true }); }
