@@ -24,7 +24,7 @@ internal static partial class Program
         SendMessage(handle, 0x8001, IntPtr.Zero, new IntPtr(0x0205));
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(desktop.TrayMenu.IsOpen && desktop.TrayMenu.IsVisible, "Right tray click must open a persistent menu even when the widget is hidden");
-        Check(desktop.TrayMenu.Items.OfType<MenuItem>().Count() == 8, "Tray must expose window actions plus geometry locking and desktop fill");
+        Check(desktop.TrayMenu.Items.OfType<MenuItem>().Count() == 9, "Tray must expose window actions plus geometry locking and desktop fill");
         var menuImage = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(desktop.TrayMenu.ActualWidth), (int)Math.Ceiling(desktop.TrayMenu.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
         menuImage.Render(desktop.TrayMenu);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(menuImage));

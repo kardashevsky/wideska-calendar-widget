@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel model;
     private DesktopIntegration? desktop;
+    private Views.TaskBoardWindow? taskBoard;
     private readonly bool enableDesktopIntegration;
     private bool initialized;
     private bool loadStarted;
@@ -71,6 +72,7 @@ public partial class MainWindow : Window
         {
             desktop = new DesktopIntegration(this);
             desktop.QuitRequested += Quit;
+            desktop.TaskBoardRequested += ShowTaskBoard;
             desktop.SettingsRequested += () => model.SettingsOpen = model.ShowWidget;
             desktop.SyncRequested += () => model.RefreshCommand.Execute(null);
             desktop.GeometryLockChanged += value => model.GeometryLocked = value;
@@ -87,6 +89,7 @@ public partial class MainWindow : Window
     }
     private void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.Language)) taskBoard?.RefreshLanguage();
         if (e.PropertyName == nameof(MainViewModel.WidgetCornerRadius)) UpdateWidgetClip();
         if (e.PropertyName is nameof(MainViewModel.SettingsOpen) or nameof(MainViewModel.IsEventOpen) or nameof(MainViewModel.ShowWidget)) StopNavigationTransition();
         if (e.PropertyName is nameof(MainViewModel.SettingsOpen) or nameof(MainViewModel.IsEventOpen) or nameof(MainViewModel.ShowWidget)) ResetIdleReturnTimer();
@@ -441,10 +444,26 @@ public partial class MainWindow : Window
         if (desktop?.Host.IsAttached == true) { model.Settings.DesktopPlacement = desktop.Host.GetBounds(); return; }
         model.Settings.Left = bounds.Left; model.Settings.Top = bounds.Top; model.Settings.Width = bounds.Width; model.Settings.Height = bounds.Height;
     }
+    private void ShowTaskBoard()
+    {
+        if (quitting) return;
+        if (taskBoard is null)
+        {
+            taskBoard = new Views.TaskBoardWindow(new TaskBoardViewModel(new LocalStore()));
+            taskBoard.Closed += (_, _) => taskBoard = null;
+        }
+        taskBoard.RefreshLanguage();
+        taskBoard.Show();
+    }
     private async void Quit()
     {
         if (quitting) return;
         quitting = true;
+        if (taskBoard is not null && !await taskBoard.SaveAndCloseAsync())
+        {
+            quitting = false;
+            return;
+        }
         geometryTimer.Stop();
         IsEnabled = false;
         CaptureGeometry();

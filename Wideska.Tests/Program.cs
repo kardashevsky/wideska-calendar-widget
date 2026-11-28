@@ -28,11 +28,11 @@ internal static partial class Program
                 case "--previews": savePreviews = true; break;
                 case "--resource-stress": suite = "stress"; break;
                 case "--desktop-smoke": suite = "full"; break;
-                case "--list": Console.WriteLine("quick, ui, full, stress (explicit only); --previews; --desktop-smoke"); return 0;
+                case "--list": Console.WriteLine("quick, ui, tasks, full, stress (explicit only); --previews; --desktop-smoke"); return 0;
                 default: Console.Error.WriteLine($"Unknown or incomplete option: {args[i]}"); return 2;
             }
         }
-        if (suite is not ("quick" or "ui" or "full" or "stress"))
+        if (suite is not ("quick" or "ui" or "tasks" or "full" or "stress"))
         {
             Console.Error.WriteLine($"Unknown suite: {suite}"); return 2;
         }
@@ -47,6 +47,7 @@ internal static partial class Program
             try
             {
                 if (suite == "stress") await RunResourceStressAsync(app);
+                else if (suite == "tasks") await RunTaskBoardSuiteAsync(app);
                 else await RunAsync(app, suite);
                 Console.WriteLine($"PASS: {assertions} assertions in {elapsed.Elapsed.TotalSeconds:F1}s"); result = 0;
             }
@@ -79,6 +80,7 @@ internal static partial class Program
         Directory.CreateDirectory(directory);
         try
         {
+            await TestTaskBoardAsync(app, directory, suite != "quick");
             var store = new LocalStore(directory);
             await store.WriteAsync("roundtrip.bin", new WidgetSettings { ClientId = "private-test-client" }, true);
             Check(!System.Text.Encoding.UTF8.GetString(await File.ReadAllBytesAsync(Path.Combine(directory, "roundtrip.bin"))).Contains("private-test-client"), "DPAPI must encrypt persisted data");
