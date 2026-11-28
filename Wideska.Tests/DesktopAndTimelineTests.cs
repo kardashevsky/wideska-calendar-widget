@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -81,6 +81,7 @@ internal static partial class Program
         var image = new System.Windows.Media.Imaging.RenderTargetBitmap(600,2000,96,96,System.Windows.Media.PixelFormats.Pbgra32);
         image.Render(timeline);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+        if (savePreviews)
         using (var file = System.IO.File.Create("artifacts/timeline.png")) encoder.Save(file);
         double headerHeight = ((System.Windows.Media.DrawingVisual)System.Windows.Media.VisualTreeHelper.GetChild(timeline, 1)).ContentBounds.Height;
         double overlapY = headerHeight + 100d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);

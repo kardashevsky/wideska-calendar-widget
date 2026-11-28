@@ -14,6 +14,7 @@ internal static partial class Program
     [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
     private static void CaptureDesktopWidget(ScreenPlacement b)
     {
+        if (!savePreviews) return;
         IntPtr source = GetDC(IntPtr.Zero), target = CreateCompatibleDC(source), bitmap = CreateCompatibleBitmap(source, b.Width, b.Height);
         IntPtr old = SelectObject(target, bitmap);
         try

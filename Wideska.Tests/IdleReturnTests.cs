@@ -49,7 +49,7 @@ internal static partial class Program
             }
             await Task.Delay(1850);
             Check(!timeline.IsScrollAnimating && Math.Abs(viewer.VerticalOffset - Target()) < 2,
-                "Idle return must place current time one third down the visible grid, within day boundaries");
+                $"Idle return must place current time one third down the visible grid: view={view}, actual={viewer.VerticalOffset:F1}, expected={Target():F1}, animating={timeline.IsScrollAnimating}");
             var widgetHandle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
             Check(GetForegroundWindow() != widgetHandle || foreground == widgetHandle,
                 "Returning to now must not activate or focus the widget");

@@ -14,15 +14,42 @@ using Wideska.ViewModels;
 internal static partial class Program
 {
     private static int assertions;
+    private static bool savePreviews;
     [STAThread]
     private static int Main()
     {
+        var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        string suite = "quick";
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--suite" when i + 1 < args.Length: suite = args[++i]; break;
+                case "--previews": savePreviews = true; break;
+                case "--resource-stress": suite = "stress"; break;
+                case "--desktop-smoke": suite = "full"; break;
+                case "--list": Console.WriteLine("quick, ui, full, stress (explicit only); --previews; --desktop-smoke"); return 0;
+                default: Console.Error.WriteLine($"Unknown or incomplete option: {args[i]}"); return 2;
+            }
+        }
+        if (suite is not ("quick" or "ui" or "full" or "stress"))
+        {
+            Console.Error.WriteLine($"Unknown suite: {suite}"); return 2;
+        }
+        if (savePreviews) Directory.CreateDirectory("artifacts");
+        Console.WriteLine($"Suite: {suite}");
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
         int result = 1;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
         app.Dispatcher.InvokeAsync(async () =>
         {
-            try { await RunAsync(app); Console.WriteLine($"PASS: {assertions} assertions"); result = 0; }
+            try
+            {
+                if (suite == "stress") await RunResourceStressAsync(app);
+                else await RunAsync(app, suite);
+                Console.WriteLine($"PASS: {assertions} assertions in {elapsed.Elapsed.TotalSeconds:F1}s"); result = 0;
+            }
             catch (Exception ex) { Console.Error.WriteLine(ex); }
             finally { app.Shutdown(); }
         });
@@ -34,7 +61,7 @@ internal static partial class Program
         assertions++;
         if (!condition) throw new InvalidOperationException(message);
     }
-    private static async Task RunAsync(Application app)
+    private static async Task RunAsync(Application app, string suite)
     {
         TestMinuteBoundary();
         TestPastDayRendering();
@@ -97,6 +124,12 @@ internal static partial class Program
             Check(vm.View == CalendarView.SingleDay && vm.Days[0].Date.Day == 29, "Leap-day navigation");
             vm.TodayCommand.Execute(null);
             await vm.RefreshAsync();
+            if (suite == "quick")
+            {
+                await TestTimeIndicatorAsync(app, directory);
+                await vm.ShutdownAsync();
+                return;
+            }
             // Load actual compiled XAML and render every view, including both themes and minimum dimensions.
             app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Wideska;component/Resources/Styles.xaml") });
             var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 960, Height = 680 };
@@ -138,21 +171,13 @@ internal static partial class Program
             window.Width = 960; window.Height = 680;
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 window.Measure(new Size(960, 680)); window.Arrange(new Rect(0, 0, 960, 680)); window.UpdateLayout();
-            var bitmap = new RenderTargetBitmap(960, 680, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(window);
-            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            string screenshot = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "calendar-smoke.png");
-            Directory.CreateDirectory(Path.GetDirectoryName(screenshot)!);
-            using (var output = File.Create(screenshot)) encoder.Save(output);
-            Console.WriteLine("Rendered " + screenshot);
+            SavePreview(window, "calendar-smoke");
             vm.DarkTheme = false;
             vm.SettingsOpen = true;
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
             Check(((SolidColorBrush)app.Resources["Surface"]).Color == (Color)ColorConverter.ConvertFromString("#FAF5F7FA"), "Light theme must update shared resources");
-            bitmap = new RenderTargetBitmap(960, 680, 96, 96, PixelFormats.Pbgra32); bitmap.Render(window);
-            encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using (var output = File.Create(Path.Combine(Path.GetDirectoryName(screenshot)!, "settings-smoke.png"))) encoder.Save(output);
+            SavePreview(window, "settings-smoke");
             System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Remove(listener);
             Check(bindingErrors == 0, "XAML must have no binding errors");
             window.Close();
@@ -160,7 +185,7 @@ internal static partial class Program
             var saved = await store.ReadAsync<WidgetSettings>("settings.bin", true);
             Check(saved?.View == CalendarView.Month, "Settings must persist");
             await TestOnboardingAsync(app, directory);
-            await TestIdleReturnAsync(app, directory);
+            if (suite == "full") await TestIdleReturnAsync(app, directory);
             await TestTimeIndicatorAsync(app, directory);
             await TestAuditRegressionsAsync(app, directory);
         }

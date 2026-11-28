@@ -69,7 +69,7 @@ internal static partial class Program
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         var card = (Border)window.FindName("EventDetailsCard");
         Check(Math.Abs(card.ActualWidth - 640) < .5, "Event details must use a balanced 640-pixel reading width on a wide widget");
-        await Task.Delay(180);
+        if (savePreviews) await Task.Delay(180);
         SavePreview(window, "event-details-rich-wide", true);
         window.Width = 420; window.Height = 560;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
