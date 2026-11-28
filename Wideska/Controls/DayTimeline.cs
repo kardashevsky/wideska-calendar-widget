@@ -2,9 +2,11 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Wideska.Services;
+using Wideska.Infrastructure;
 using Wideska.ViewModels;
 
 namespace Wideska.Controls;
@@ -47,6 +49,19 @@ public sealed class DayTimeline : Control
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> hits = [];
     private readonly List<(Rect Bounds, string Details, EventItem? Event)> headerHits = [];
     private ScrollViewer? scrollOwner;
+    private ScrollContentPresenter? scrollPresenter;
+    private ScrollBar? verticalScrollBar;
+    private readonly TranslateTransform scrollTransform = new();
+    private readonly ScrollMotion scrollMotion = new();
+    private readonly System.Diagnostics.Stopwatch scrollClock = new();
+    private double previousFrameSeconds;
+    private TimeSpan? previousRenderingTime;
+    private int scrollDirection;
+    private bool committingScroll;
+    internal bool IsScrollAnimating => scrollClock.IsRunning;
+    internal double DisplayedVerticalOffset => IsScrollAnimating ? scrollMotion.Position : scrollOwner?.VerticalOffset ?? 0;
+    internal int LayoutPassCount { get; private set; }
+    internal int DrawPassCount { get; private set; }
     private double headerHeight;
     private bool drawingHeader;
     private INotifyCollectionChanged? observed;
@@ -57,6 +72,7 @@ public sealed class DayTimeline : Control
     private bool automaticScrollComplete;
     private readonly DrawingVisual timeBadge = new();
     private readonly DrawingVisual stickyHeader = new();
+    private readonly DrawingVisual calendarBody = new();
     private double badgeY = double.NaN;
     public event Action? ViewportChanged;
     internal int TodayNavigationDirection
@@ -86,6 +102,7 @@ public sealed class DayTimeline : Control
     }
     public void RevealToday()
     {
+        FinishVisualScroll(true);
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
         {
             if (!IsVisible || scrollOwner is null) return;
@@ -96,22 +113,27 @@ public sealed class DayTimeline : Control
             scrollOwner.ScrollToHorizontalOffset(Math.Clamp(index * column, 0, scrollOwner.ScrollableWidth));
         });
     }
-    protected override int VisualChildrenCount => 2;
-    protected override Visual GetVisualChild(int index) => index switch { 0 => timeBadge, 1 => stickyHeader, _ => throw new ArgumentOutOfRangeException(nameof(index)) };
+    protected override int VisualChildrenCount => 3;
+    protected override Visual GetVisualChild(int index) => index switch { 0 => calendarBody, 1 => stickyHeader, 2 => timeBadge, _ => throw new ArgumentOutOfRangeException(nameof(index)) };
     protected override Size MeasureOverride(Size availableSize) => new(double.IsFinite(availableSize.Width) ? availableSize.Width : MinWidth, MinimumTimelineHeight);
-    protected override Size ArrangeOverride(Size finalSize) => finalSize;
+    protected override Size ArrangeOverride(Size finalSize) { LayoutPassCount++; return finalSize; }
     public DayTimeline()
     {
         AddVisualChild(timeBadge);
         AddVisualChild(stickyHeader);
+        AddVisualChild(calendarBody);
         MinHeight = MinimumTimelineHeight;
+        calendarBody.Transform = scrollTransform;
+        timeBadge.Transform = scrollTransform;
+        PreviewMouseWheel += OnTimelineWheel;
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         Loaded += (_, _) => { Observe(); ConnectScrollOwner(); ScheduleScroll(); };
-        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else ClearHover(); };
-        Unloaded += (_, _) => { ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; DisconnectScrollOwner(); };
+        IsVisibleChanged += (_, _) => { if (IsVisible) ScheduleScroll(); else { FinishVisualScroll(true); ClearHover(); } };
+        Unloaded += (_, _) => { FinishVisualScroll(false); ClearHover(); if (observed is not null) observed.CollectionChanged -= CollectionChanged; observed = null; DisconnectScrollOwner(); };
         MouseLeave += (_, _) => { Cursor = Cursors.Arrow; ClearHover(); };
         MouseMove += (_, e) =>
         {
+            if (IsScrollAnimating) { Cursor = Cursors.Arrow; return; }
             var hit = ItemAt(e.GetPosition(this));
             Cursor = hit.Event is not null ? Cursors.Hand : Cursors.Arrow;
             string? details = hit.Details;
@@ -119,6 +141,67 @@ public sealed class DayTimeline : Control
             if (details is null) { ClearHover(); return; }
             hover = details; eventToolTip.Content = details; ToolTip = eventToolTip; InvalidateVisual();
         };
+    }
+    private void OnTimelineWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (scrollOwner is null || scrollPresenter is null || e.Delta == 0 || !SystemParameters.ClientAreaAnimation) return;
+        int direction = Math.Sign(e.Delta);
+        double current = DisplayedVerticalOffset;
+        double target = IsScrollAnimating && direction == scrollDirection ? scrollMotion.Target : current;
+        if (!IsScrollAnimating || direction != scrollDirection) scrollMotion.Reset(current);
+        scrollMotion.Retarget(Math.Clamp(target - e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * 72, 0, scrollOwner.ScrollableHeight));
+        scrollDirection = direction;
+        ClearHover(); Cursor = Cursors.Arrow;
+        if (!IsScrollAnimating)
+        {
+            previousFrameSeconds = 0; previousRenderingTime = null;
+            scrollClock.Restart();
+            CompositionTarget.Rendering += OnVisualScrollFrame;
+        }
+        e.Handled = true;
+    }
+    private void OnVisualScrollFrame(object? sender, EventArgs e)
+    {
+        if (scrollOwner is null || !IsVisible) { FinishVisualScroll(true); return; }
+        if (e is RenderingEventArgs frame)
+        {
+            if (previousRenderingTime == frame.RenderingTime) return;
+            previousRenderingTime = frame.RenderingTime;
+        }
+        double seconds = scrollClock.Elapsed.TotalSeconds;
+        scrollMotion.Advance(seconds - previousFrameSeconds);
+        previousFrameSeconds = seconds;
+        // Keep layout and ScrollViewer offsets unchanged while moving retained visuals only.
+        scrollTransform.Y = scrollOwner.VerticalOffset - scrollMotion.Position;
+        UpdateHeaderPosition(false);
+        verticalScrollBar?.SetCurrentValue(RangeBase.ValueProperty, scrollMotion.Position);
+        if (scrollMotion.IsSettled) FinishVisualScroll(true);
+    }
+    private void FinishVisualScroll(bool commit)
+    {
+        if (!IsScrollAnimating) return;
+        double offset = scrollMotion.IsSettled ? scrollMotion.Target : scrollMotion.Position;
+        CompositionTarget.Rendering -= OnVisualScrollFrame;
+        scrollClock.Reset();
+        committingScroll = true;
+        try
+        {
+            if (commit && scrollPresenter is IScrollInfo info)
+            {
+                info.SetVerticalOffset(offset);
+                scrollOwner?.UpdateLayout();
+            }
+            scrollTransform.Y = 0;
+            if (scrollOwner is not null) verticalScrollBar?.SetCurrentValue(RangeBase.ValueProperty, scrollOwner.VerticalOffset);
+            UpdateHeaderPosition(false);
+        }
+        finally { committingScroll = false; }
+    }
+    private void OnScrollPointerInput(object sender, MouseButtonEventArgs e) => FinishVisualScroll(true);
+    private void OnScrollBarInput(object sender, ScrollEventArgs e) => FinishVisualScroll(true);
+    private void OnScrollKeyInput(object sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End) FinishVisualScroll(true);
     }
     private void ClearHover()
     {
@@ -137,7 +220,8 @@ public sealed class DayTimeline : Control
     }
     private (Rect Bounds, string Details, EventItem? Event) ItemAt(Point position)
     {
-        double offset = scrollOwner?.VerticalOffset ?? 0;
+        position.Y += DisplayedVerticalOffset - (scrollOwner?.VerticalOffset ?? 0);
+        double offset = DisplayedVerticalOffset;
         if (position.Y >= offset && position.Y < offset + headerHeight)
             return headerHits.LastOrDefault(h => h.Bounds.Contains(new Point(position.X, position.Y - offset)));
         return hits.LastOrDefault(h => h.Bounds.Contains(position));
@@ -145,20 +229,38 @@ public sealed class DayTimeline : Control
     public EventItem? EventAt(Point position) => ItemAt(position).Event;
     private void ConnectScrollOwner()
     {
+        FinishVisualScroll(true);
         DisconnectScrollOwner();
         DependencyObject? parent = VisualTreeHelper.GetParent(this);
         while (parent is not null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
         scrollOwner = parent as ScrollViewer;
-        if (scrollOwner is not null) scrollOwner.ScrollChanged += OnScrollChanged;
+        if (scrollOwner is not null)
+        {
+            scrollPresenter = scrollOwner.Template.FindName("PART_ScrollContentPresenter", scrollOwner) as ScrollContentPresenter;
+            verticalScrollBar = scrollOwner.Template.FindName("PART_VerticalScrollBar", scrollOwner) as ScrollBar;
+            scrollOwner.ScrollChanged += OnScrollChanged;
+            scrollOwner.AddHandler(PreviewMouseDownEvent, new MouseButtonEventHandler(OnScrollPointerInput), true);
+            scrollOwner.AddHandler(PreviewKeyDownEvent, new KeyEventHandler(OnScrollKeyInput), true);
+            scrollOwner.AddHandler(ScrollBar.ScrollEvent, new ScrollEventHandler(OnScrollBarInput), true);
+        }
         UpdateHeaderPosition();
     }
     private void DisconnectScrollOwner()
     {
-        if (scrollOwner is not null) scrollOwner.ScrollChanged -= OnScrollChanged;
+        if (scrollOwner is not null)
+        {
+            scrollOwner.ScrollChanged -= OnScrollChanged;
+            scrollOwner.RemoveHandler(PreviewMouseDownEvent, new MouseButtonEventHandler(OnScrollPointerInput));
+            scrollOwner.RemoveHandler(PreviewKeyDownEvent, new KeyEventHandler(OnScrollKeyInput));
+            scrollOwner.RemoveHandler(ScrollBar.ScrollEvent, new ScrollEventHandler(OnScrollBarInput));
+        }
         scrollOwner = null;
+        scrollPresenter = null; verticalScrollBar = null;
     }
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
+        if (committingScroll) return;
+        if (e.VerticalChange != 0 || e.ViewportHeightChange != 0 || e.ExtentHeightChange != 0) FinishVisualScroll(false);
         if (e.VerticalChange == 0 && e.HorizontalChange == 0 && e.ViewportHeightChange == 0 && e.ViewportWidthChange == 0) return;
         ClearHover(); UpdateHeaderPosition(e.HorizontalChange != 0 || e.ViewportWidthChange != 0);
         if (IsMouseOver) Cursor = ItemAt(Mouse.GetPosition(this)).Event is not null ? Cursors.Hand : Cursors.Arrow;
@@ -175,14 +277,18 @@ public sealed class DayTimeline : Control
         var viewport = new Rect(left, offset, Math.Max(0, width), Math.Max(0, height));
         if (Clip is RectangleGeometry currentClip && !currentClip.IsFrozen) currentClip.Rect = viewport;
         else Clip = new RectangleGeometry(viewport);
-        var badgeClip = new Rect(0, offset + headerHeight, ActualWidth, Math.Max(0, ActualHeight - offset - headerHeight));
+        double displayed = DisplayedVerticalOffset;
+        var badgeClip = new Rect(0, displayed + headerHeight, ActualWidth, Math.Max(0, ActualHeight - displayed - headerHeight));
         if (timeBadge.Clip is RectangleGeometry currentBadgeClip && !currentBadgeClip.IsFrozen) currentBadgeClip.Rect = badgeClip;
         else timeBadge.Clip = new RectangleGeometry(badgeClip);
+        if (calendarBody.Clip is RectangleGeometry bodyClip && !bodyClip.IsFrozen) bodyClip.Rect = badgeClip;
+        else calendarBody.Clip = new RectangleGeometry(badgeClip);
         if (notifyViewport) ViewportChanged?.Invoke();
     }
     private static void DaysChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var timeline = (DayTimeline)d;
+        timeline.FinishVisualScroll(true);
         timeline.Observe();
     }
     private void Observe()
@@ -242,7 +348,14 @@ public sealed class DayTimeline : Control
     }
     protected override void OnRender(DrawingContext dc)
     {
-        base.OnRender(dc); hits.Clear(); headerHits.Clear(); badgeY = double.NaN;
+        DrawPassCount++;
+        base.OnRender(dc);
+        using var body = calendarBody.RenderOpen();
+        DrawCalendar(body);
+    }
+    private void DrawCalendar(DrawingContext dc)
+    {
+        hits.Clear(); headerHits.Clear(); badgeY = double.NaN;
         var days = Days?.ToList() ?? [];
         if (days.Count == 0 || ActualWidth <= TimeGutterWidth) { RenderTimeBadge(); using var empty = stickyHeader.RenderOpen(); return; }
         double column = (ActualWidth - TimeGutterWidth) / days.Count;

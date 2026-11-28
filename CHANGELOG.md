@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Dim past calendar days and their events without blocking interaction; use the selected calendar time zone and preserve today's highlighting.
-- Restore native WPF wheel and scrollbar behavior; remove custom scroll animation, inertia and slot snapping.
+- Animate wheel scrolling through retained visual translation without arranging or redrawing the calendar each frame; commit the native offset only when movement finishes.
+- Keep the sticky header, event hit targets and scrollbar aligned during movement; preserve native input when Windows animations are disabled.
 - Animate Show Today with the same directional carousel used by period navigation, including horizontally hidden day columns.
 - Use zero-padded 24-hour event times in both interface languages.
 - Remove delayed half-hour snapping that caused a second movement after wheel scrolling.
