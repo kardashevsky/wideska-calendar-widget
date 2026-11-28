@@ -433,13 +433,21 @@ public sealed class DayTimeline : Control
         using var dc = stickyHeader.RenderOpen();
         Brush background = SurfaceBrush;
         if (SurfaceBrush is SolidColorBrush solid) background = new SolidColorBrush(Color.FromRgb(solid.Color.R, solid.Color.G, solid.Color.B));
-        dc.DrawRectangle(background, null, new Rect(0, 0, ActualWidth, headerHeight));
+        var headerBounds = new Rect(TimeGutterWidth, 0, Math.Max(0, ActualWidth - TimeGutterWidth), headerHeight);
+        dc.PushClip(new RectangleGeometry(headerBounds, 10, 10));
+        dc.DrawRoundedRectangle(background, null, headerBounds, 10, 10);
         drawingHeader = true;
         try
         {
             for (int index = 0; index < days.Count; index++)
             {
                 var day = days[index]; double x = TimeGutterWidth + index * column;
+                if (index > 0)
+                {
+                    dc.PushOpacity(.45);
+                    dc.DrawLine(new Pen(GridBrush, 1), new Point(x, 8), new Point(x, headerHeight - 8));
+                    dc.Pop();
+                }
                 headerHits.Add((new Rect(x, 0, column, headerHeight), day.Summary, null));
                 bool isToday = index == today;
                 if (isToday)
@@ -460,8 +468,8 @@ public sealed class DayTimeline : Control
                 if (day.IsPast) dc.DrawRectangle(PastDayShade, null, new Rect(x, 0, column, headerHeight));
             }
         }
-        finally { drawingHeader = false; }
-        dc.DrawLine(new Pen(GridBrush, 1), new Point(0, headerHeight - .5), new Point(ActualWidth, headerHeight - .5));
+        finally { drawingHeader = false; dc.Pop(); }
+        dc.DrawLine(new Pen(GridBrush, 1), new Point(TimeGutterWidth, headerHeight - .5), new Point(ActualWidth, headerHeight - .5));
     }
     private void RenderTimeBadge()
     {

@@ -139,10 +139,12 @@ public partial class MainWindow : Window
         if (HeaderPeriod is null || HeaderNavigation is null || TodayButton is null) return;
         // Reserve the optional button in the breakpoint calculation so showing it cannot shift the calendar vertically.
         double navigationWidth = PreviousPeriodButton.Width + CalendarViewSelector.Width + NextPeriodButton.Width + 8;
-        double requiredWidth = navigationWidth + 148 + HeaderPeriod.DesiredSize.Width + 20;
+        double titleInset = Math.Max(0, Controls.DayTimeline.TimeGutterWidth - CalendarHeader.Margin.Left);
+        double titleWidth = Math.Max(0, HeaderPeriod.DesiredSize.Width - HeaderPeriod.Margin.Left - HeaderPeriod.Margin.Right);
+        double requiredWidth = navigationWidth + 148 + titleWidth + titleInset + 20;
         bool narrow = CalendarHeader.ActualWidth < Math.Max(480, requiredWidth);
         System.Windows.Controls.Grid.SetRow(HeaderNavigation, narrow ? 1 : 0);
-        HeaderPeriod.Margin = narrow ? new Thickness(0, 0, 0, 7) : new Thickness(0, 3, 0, 3);
+        HeaderPeriod.Margin = narrow ? new Thickness(titleInset, 0, 0, 7) : new Thickness(titleInset, 3, 0, 3);
     }
     private void OnNavigatePeriod(object sender, RoutedEventArgs e)
         => BeginPeriodTransition(ReferenceEquals(sender, NextPeriodButton) ? 1 : -1);
