@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-11-28
 
 - After ten seconds without widget input, gently return to today's schedule without taking focus; place current time one third down the time grid and retain two thirds for upcoming events.
 - Pause automatic navigation while reading event details, editing settings or dragging; cancel it immediately on new input and return month/year views to the current period.

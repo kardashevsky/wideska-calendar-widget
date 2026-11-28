@@ -2,6 +2,17 @@
 
 This report lists changes made during the pre-release audit, rather than existing features. The validation counts below describe that audit stage; subsequent UI refinements are covered by the release verification.
 
+## 0.2.0 release verification (2026-11-28)
+
+- Release build: zero warnings and zero errors; 463 passing assertions.
+- Wheel scrolling moves retained visual layers without arranging or redrawing the calendar on every frame. Tests cover rapid downward movement followed by slow upward input, real hit testing over empty slots, direction changes, pinned headers and scrollbar handoff.
+- Period navigation uses frozen snapshots, coalesces repeated arrow clicks without losing requested dates, and releases snapshots on completion, hide and close. Each snapshot remains capped at 2048 pixels per side; two square pixel buffers can total 32 MiB before framework/driver overhead.
+- Native WPF event descriptions preserve paragraphs, emphasis, lists and safe links. Input is bounded to 65,536 characters, 2,048 tags and 32 nested formatting spans. Scripts, embedded objects and remote images are not rendered; navigation accepts only HTTP, HTTPS and mailto destinations.
+- The real ten-second idle timer is tested for restart after input, focus preservation, gentle positioning at one third of the time-grid viewport, cancellation, modal/settings suspension and month/year return behavior. Window-lifecycle coverage includes the new timer subscriptions.
+- Synthetic visual checks cover the responsive event-details card at 640 pixels and in a 420-pixel widget, compact half-hour event times, midnight bounds and the revised date header.
+
+These checks do not constitute a multi-day production soak or a new live Google OAuth test. Screen-capture exclusion remains unimplemented, and the distributed executable is unsigned.
+
 ## Memory and lifecycle fixes
 
 - Closed windows could remain referenced through view-model subscriptions and bindings. Subscriptions now start with the loaded window, are removed on close, and the closed window releases its data context. Regression coverage keeps the view model alive and verifies garbage collection of three shown windows and one closed before showing.
