@@ -37,6 +37,7 @@ public sealed class DesktopHost : IDisposable
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out NativeRect rect);
     [DllImport("user32.dll")] private static extern bool ScreenToClient(IntPtr window, ref NativePoint point);
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
+    [DllImport("user32.dll")] private static extern bool RedrawWindow(IntPtr window, IntPtr rectangle, IntPtr region, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
     [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
@@ -153,6 +154,17 @@ public sealed class DesktopHost : IDisposable
     public void RaiseWithinDesktop()
     {
         if (IsAttached) SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0, 0x13);
+    }
+    public void RefreshSurface()
+    {
+        if (!IsAttached) return;
+        // Reparenting a layered WPF window can leave its first surface stale until a resize.
+        if (window.Content is UIElement content) content.InvalidateVisual();
+        var bounds = GetBounds();
+        // Recreate the layered backing surface, then restore the exact requested geometry.
+        SetBounds(bounds with { Width = bounds.Width + 1 });
+        SetBounds(bounds);
+        RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, 0x185); // invalidate, erase, all children, update now
     }
     private IntPtr Hook(IntPtr hwnd, int message, IntPtr w, IntPtr l, ref bool handled)
     {

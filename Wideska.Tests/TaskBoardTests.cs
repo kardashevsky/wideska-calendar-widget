@@ -92,6 +92,21 @@ internal static partial class Program
             SavePreview(window, "task-board-compact");
         }
         finally { await window.SaveAndCloseAsync(); }
+        if (savePreviews)
+        {
+            // Validate the actual desktop surface as well as offscreen WPF rendering.
+            board.Placement = new(20, 20, 1080, 620);
+            var desktopWindow = new Wideska.Views.TaskBoardWindow(board);
+            desktopWindow.ShowWidget();
+            try
+            {
+                await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await Task.Delay(150);
+                using var inspection = new Wideska.Infrastructure.DesktopHost(desktopWindow);
+                CaptureDesktopWidget(inspection.GetBounds());
+            }
+            finally { await desktopWindow.SaveAndCloseAsync(); }
+        }
     }
     private static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
     {
