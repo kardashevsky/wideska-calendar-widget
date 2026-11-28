@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Wideska.Infrastructure;
 using Wideska.Models;
 using Wideska.Services;
@@ -38,6 +39,8 @@ public partial class TaskBoardWindow : Window
         if (loaded) return;
         loaded = true;
         await model.InitializeAsync();
+        // Let WPF present the initial layered surface before converting the HWND to a desktop child.
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (closing) return;
         if (attachToDesktop)
         {
@@ -53,6 +56,7 @@ public partial class TaskBoardWindow : Window
                 }
                 host.RecoverToScreen();
                 host.RaiseWithinDesktop();
+                host.RefreshSurface();
             }
             catch (Exception ex) { host?.Dispose(); host = null; MessageBox.Show(ex.Message, "Wideska Widget", MessageBoxButton.OK, MessageBoxImage.Warning); }
         }
@@ -73,6 +77,7 @@ public partial class TaskBoardWindow : Window
         {
             host.RecoverToScreen();
             host.RaiseWithinDesktop();
+            host.RefreshSurface();
         }
     }
     private async void OnClosing(object? sender, CancelEventArgs e)
