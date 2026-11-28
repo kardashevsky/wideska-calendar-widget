@@ -105,7 +105,7 @@ internal static partial class Program
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
             Check(references.All(reference => !reference.IsAlive), "Closed windows must not be retained by a live view model's event subscriptions");
 
-            var window = new Wideska.MainWindow(vm, false) { Width = 3000, Height = 1800 };
+            var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 3000, Height = 1800 };
             window.Show();
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             vm.View = CalendarView.Week;

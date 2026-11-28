@@ -52,7 +52,7 @@ internal static partial class Program
         Check(vm.ShowAuthorization && !vm.ShowWidget, "No calendar may flash before the initial account check");
         await vm.InitializeAsync();
         Check(vm.ShowAuthorization && !vm.ShowWidget && vm.Calendars.Count == 0 && provider.Requests == 0, "Signed-out launch must not display cached account data or request events");
-        var window = new Wideska.MainWindow(vm, false) { Width = 480, Height = 740 };
+        var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 480, Height = 740 };
         window.Show();
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(!((UIElement)window.FindName("WidgetRoot")).IsVisible && ((UIElement)window.FindName("AuthorizationRoot")).IsVisible, "Authorization must replace the calendar in the visual tree");

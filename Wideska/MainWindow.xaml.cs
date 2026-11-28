@@ -36,13 +36,14 @@ public partial class MainWindow : Window
         var store = new LocalStore();
         return new MainViewModel(store, new GoogleCalendarProvider(store));
     }
-    public MainWindow(MainViewModel viewModel, bool enableDesktopIntegration)
+    public MainWindow(MainViewModel viewModel, bool enableDesktopIntegration, bool enableIdleReturn = true)
     {
         InitializeComponent();
         model = viewModel;
         this.enableDesktopIntegration = enableDesktopIntegration;
         DataContext = model;
-        IsVisibleChanged += (_, _) => { model.SetClockVisible(IsVisible); if (!IsVisible) StopNavigationTransition(); };
+        InitializeIdleReturn(enableIdleReturn);
+        IsVisibleChanged += (_, _) => { model.SetClockVisible(IsVisible); ResetIdleReturnTimer(); if (!IsVisible) StopNavigationTransition(); };
         MouseMove += OnMove;
         PreviewKeyDown += OnPreviewKeyDown;
         MouseLeftButtonUp += (_, _) => { dragPoint = null; Mouse.Capture(null); };
@@ -64,6 +65,7 @@ public partial class MainWindow : Window
         model.FitDesktopRequested += FitDesktop;
         model.PropertyChanged += OnModelPropertyChanged;
         Timeline.ViewportChanged += UpdateTodayVisibility;
+        ResetIdleReturnTimer();
         if (!enableDesktopIntegration) { ApplyAppearance(); return; }
         try
         {
@@ -87,6 +89,7 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.WidgetCornerRadius)) UpdateWidgetClip();
         if (e.PropertyName is nameof(MainViewModel.SettingsOpen) or nameof(MainViewModel.IsEventOpen) or nameof(MainViewModel.ShowWidget)) StopNavigationTransition();
+        if (e.PropertyName is nameof(MainViewModel.SettingsOpen) or nameof(MainViewModel.IsEventOpen) or nameof(MainViewModel.ShowWidget)) ResetIdleReturnTimer();
     }
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -115,6 +118,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         geometryTimer.Stop();
+        DisposeIdleReturn();
         StopNavigationTransition();
         model.AppearanceChanged -= ApplyAppearance;
         model.FitDesktopRequested -= FitDesktop;

@@ -58,7 +58,12 @@ public sealed class DayTimeline : Control
     private TimeSpan? previousRenderingTime;
     private int scrollDirection;
     private bool committingScroll;
+    private bool returningToNow;
+    private double returnStartOffset;
+    private double returnTargetOffset;
+    private double returnDurationSeconds;
     internal bool IsScrollAnimating => scrollClock.IsRunning;
+    internal bool IsReturningToNow => returningToNow && IsScrollAnimating;
     internal double DisplayedVerticalOffset => IsScrollAnimating ? scrollMotion.Position : scrollOwner?.VerticalOffset ?? 0;
     internal int LayoutPassCount { get; private set; }
     internal int DrawPassCount { get; private set; }
@@ -145,6 +150,7 @@ public sealed class DayTimeline : Control
     }
     private void OnTimelineWheel(object sender, MouseWheelEventArgs e)
     {
+        CancelIdleReturn();
         if (scrollOwner is null || scrollPresenter is null || e.Delta == 0 || !SystemParameters.ClientAreaAnimation) return;
         int direction = Math.Sign(e.Delta);
         double current = DisplayedVerticalOffset;
@@ -161,6 +167,38 @@ public sealed class DayTimeline : Control
         }
         e.Handled = true;
     }
+    internal void CancelIdleReturn()
+    {
+        if (returningToNow) FinishVisualScroll(true);
+    }
+    internal void ReturnToCurrentTime()
+    {
+        if (scrollOwner is null || scrollPresenter is null || !IsVisible || headerHeight <= 0) return;
+        var today = Days?.FirstOrDefault(d => CalendarTime.IndicatorMinutes(d.Date, CurrentTime, TimeZoneId) is not null);
+        if (today is null) return;
+        double minutes = CalendarTime.IndicatorMinutes(today.Date, CurrentTime, TimeZoneId)!.Value;
+        double bodyHeight = ActualHeight - headerHeight - TimelineBottomPadding;
+        double target = Math.Clamp(minutes / 1440 * bodyHeight - Math.Max(0, scrollOwner.ViewportHeight - headerHeight) / 3,
+            0, scrollOwner.ScrollableHeight);
+        double current = DisplayedVerticalOffset;
+        if (Math.Abs(target - current) < 1) return;
+        FinishVisualScroll(true);
+        if (!SystemParameters.ClientAreaAnimation)
+        {
+            ((IScrollInfo)scrollPresenter).SetVerticalOffset(target);
+            scrollOwner.UpdateLayout();
+            return;
+        }
+        returningToNow = true;
+        returnStartOffset = current;
+        returnTargetOffset = target;
+        returnDurationSeconds = Math.Clamp(Math.Abs(target - current) / 800, .8, 1.8);
+        scrollMotion.Reset(current);
+        previousFrameSeconds = 0; previousRenderingTime = null;
+        ClearHover(); Cursor = Cursors.Arrow;
+        scrollClock.Restart();
+        CompositionTarget.Rendering += OnVisualScrollFrame;
+    }
     private void OnVisualScrollFrame(object? sender, EventArgs e)
     {
         if (scrollOwner is null || !IsVisible) { FinishVisualScroll(true); return; }
@@ -170,17 +208,26 @@ public sealed class DayTimeline : Control
             previousRenderingTime = frame.RenderingTime;
         }
         double seconds = scrollClock.Elapsed.TotalSeconds;
-        scrollMotion.Advance(seconds - previousFrameSeconds);
+        bool settled;
+        if (returningToNow)
+        {
+            double progress = Math.Clamp(seconds / returnDurationSeconds, 0, 1);
+            double eased = progress * progress * progress * (progress * (progress * 6 - 15) + 10);
+            scrollMotion.Reset(returnStartOffset + (returnTargetOffset - returnStartOffset) * eased);
+            settled = progress >= 1;
+        }
+        else { scrollMotion.Advance(seconds - previousFrameSeconds); settled = scrollMotion.IsSettled; }
         previousFrameSeconds = seconds;
         // Keep layout and ScrollViewer offsets unchanged while moving retained visuals only.
         scrollTransform.Y = scrollOwner.VerticalOffset - scrollMotion.Position;
         UpdateHeaderPosition(false);
         verticalScrollBar?.SetCurrentValue(RangeBase.ValueProperty, scrollMotion.Position);
-        if (scrollMotion.IsSettled) FinishVisualScroll(true);
+        if (settled) FinishVisualScroll(true);
     }
     private void FinishVisualScroll(bool commit)
     {
         if (!IsScrollAnimating) return;
+        returningToNow = false;
         double offset = scrollMotion.IsSettled ? scrollMotion.Target : scrollMotion.Position;
         CompositionTarget.Rendering -= OnVisualScrollFrame;
         scrollClock.Reset();
