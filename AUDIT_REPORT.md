@@ -65,7 +65,7 @@ The audit used synthetic Google responses and local Windows UI tests. It did not
 
 ```powershell
 dotnet build Wideska/Wideska.slnx -c Release --artifacts-path artifacts/audit-build --disable-build-servers
-& artifacts/audit-build/bin/Wideska.Tests/release/Wideska.Tests.exe
+& artifacts/audit-build/bin/Wideska.Tests/release/Wideska.Tests.exe --suite full
 # Optional: temporarily minimizes/restores ordinary windows.
 & artifacts/audit-build/bin/Wideska.Tests/release/Wideska.Tests.exe --desktop-smoke
 dotnet list Wideska/Wideska.csproj package --vulnerable --include-transitive
