@@ -34,7 +34,8 @@ internal static partial class Program
         Check(allDay?.AllDay == true, "Pinned all-day cards must retain their event hit targets after scrolling");
         var hidden = timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, viewer.VerticalOffset + headerHeight - 2));
         Check(hidden is null, "Events scrolling under the pinned header must not receive clicks through it");
-        Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, 900)) is null, "Empty hourly slots must not be treated as event hit targets");
+        double emptyY = headerHeight + 900d / 1440 * (timeline.ActualHeight - headerHeight - DayTimeline.TimelineBottomPadding);
+        Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, emptyY)) is null, "Empty hourly slots must not be treated as event hit targets");
         double eventY = headerHeight + 655d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);
         Check(timeline.EventAt(new Point(DayTimeline.TimeGutterWidth + 20, eventY))?.Title == "Planning session", "Timed event hit targets must remain aligned after scrolling");
         foreach (int delta in new[] { -120, 120 })
