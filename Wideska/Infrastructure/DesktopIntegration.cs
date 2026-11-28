@@ -19,6 +19,7 @@ public sealed class DesktopIntegration : IDisposable
     public event Action? QuitRequested;
     public event Action? SettingsRequested;
     public event Action? SyncRequested;
+    public event Action? TaskBoardRequested;
     public ContextMenu TrayMenu { get; }
     public DesktopHost Host { get; }
     public event Action<bool>? GeometryLockChanged;
@@ -58,6 +59,7 @@ public sealed class DesktopIntegration : IDisposable
         TrayMenu = new ContextMenu { Placement = PlacementMode.MousePoint };
         TrayMenu.SetResourceReference(FrameworkElement.StyleProperty, "TrayContextMenu");
         AddMenuItem("Show widget", Show);
+        AddMenuItem("Task matrix", () => TaskBoardRequested?.Invoke());
         AddMenuItem("Hide widget (keep running)", window.Hide);
         TrayMenu.Items.Add(new Separator());
         AddMenuItem("Settings / Google sign-in", () => { Show(); SettingsRequested?.Invoke(); });
@@ -74,7 +76,7 @@ public sealed class DesktopIntegration : IDisposable
         Host = new DesktopHost(window);
         try
         {
-            icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Wideska", Info = "", Title = "" };
+            icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Vedeska Widget", Info = "", Title = "" };
             if (!Shell_NotifyIcon(0, ref icon)) throw new InvalidOperationException("Unable to create the system tray icon.");
         }
         catch
