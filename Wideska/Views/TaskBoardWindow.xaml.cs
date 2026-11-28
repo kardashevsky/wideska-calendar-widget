@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -23,6 +24,7 @@ public partial class TaskBoardWindow : Window
     private bool loaded;
     private bool closing;
     private bool editing;
+    private Border? activeDropZone;
     public TaskBoardWindow(TaskBoardViewModel model, bool attachToDesktop = true)
     {
         AppLocalization.EnsureInitialized();
@@ -155,7 +157,26 @@ public partial class TaskBoardWindow : Window
         var delta = e.GetPosition(this) - start;
         if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance) return;
         dragStart = null;
-        DragDrop.DoDragDrop(card, new DataObject(DragFormat, task.Id.ToString()), DragDropEffects.Move);
+        var layer = AdornerLayer.GetAdornerLayer(BoardSurface);
+        var preview = new Controls.TaskDragAdorner(BoardSurface, card, TranslatePoint(start, card));
+        double originalOpacity = card.Opacity;
+        GiveFeedbackEventHandler feedback = (_, _) => preview.UpdatePosition();
+        try
+        {
+            layer?.Add(preview);
+            preview.UpdatePosition();
+            card.Opacity = .3;
+            card.GiveFeedback += feedback;
+            DragDrop.DoDragDrop(card, new DataObject(DragFormat, task.Id.ToString()), DragDropEffects.Move);
+        }
+        finally
+        {
+            card.GiveFeedback -= feedback;
+            card.Opacity = originalOpacity;
+            layer?.Remove(preview);
+            if (activeDropZone is not null) activeDropZone.Opacity = 1;
+            activeDropZone = null;
+        }
     }
     private bool TryTask(DragEventArgs e, out Guid id)
     {
@@ -167,6 +188,8 @@ public partial class TaskBoardWindow : Window
     private void OnDragOver(object sender, DragEventArgs e)
     {
         e.Effects = TryTask(e, out _) ? DragDropEffects.Move : DragDropEffects.None;
+        if (activeDropZone is not null && activeDropZone != sender) activeDropZone.Opacity = 1;
+        activeDropZone = (Border)sender;
         ((Border)sender).Opacity = e.Effects == DragDropEffects.Move ? .75 : 1;
         e.Handled = true;
     }
