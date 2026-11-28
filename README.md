@@ -1,6 +1,37 @@
-# Wideska
+# Vedeska Widget
 
-An MIT-licensed Windows desktop calendar widget built with C#, .NET 10 and WPF. The application uses MVVM and has no third-party runtime packages.
+An MIT-licensed collection of Windows desktop widgets for personal planning: a calendar and an Eisenhower task matrix. Built with C#, .NET 10, WPF and MVVM, without third-party runtime packages. Vedeska Widget is the working product name; existing Wideska executable names, data paths, OAuth configuration and repository URLs remain compatible during prototyping.
+
+## Task matrix prototype
+
+Build and launch the current development executable, then choose **Task matrix**
+from the tray. Exit an older running build first: the single-instance mechanism
+otherwise restores that existing version.
+
+The independent widget has Backlog on the left, four priority quadrants in the
+middle, and Done on the right. Add a task and drag its card between these areas.
+The card menu also moves tasks and edits their titles. Completed tasks can be
+returned to any quadrant or Backlog. The ranges are planning guidance, not
+automatically assigned deadlines:
+
+| Quadrant | Planning horizon |
+| --- | --- |
+| Important and urgent | 1–2 days |
+| Urgent, not important | 1–3 days |
+| Important, not urgent | 3–7 days |
+| Neither urgent nor important | 7–31 days |
+
+Tasks are saved locally with Windows encryption in a separate `task-board.bin`
+file under the existing application data directory. They do not require Google
+authorization. Drag the heading to move the widget; use its lower-right grip to
+resize it. Position is saved after dragging/resizing and on exit. Alt+F4 hides
+the board; reopen it from the tray. Exit from the tray saves both widgets, and
+failed task writes are shown with a Retry action.
+
+This prototype does not yet schedule tasks into Google Calendar, synchronize
+tasks across devices, reorder cards within a column or replace the current
+calendar. The repository and workspace folder have not been renamed. A future
+repository name can be `vedeska-widget` after the product name is settled.
 
 ## Download
 

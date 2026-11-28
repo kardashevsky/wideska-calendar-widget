@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('auto', 'quick', 'ui', 'full', 'stress')]
+    [ValidateSet('auto', 'quick', 'ui', 'tasks', 'full', 'stress')]
     [string]$Suite = 'auto',
     [string]$BaseRef = 'origin/develop',
     [switch]$Plan,
@@ -29,6 +29,7 @@ try {
             if ($code -match '(?i)(IdleReturn|Wideska.Tests/|\.csproj$|\.slnx$|\.props$|\.targets$|\.github/)' -or
                 @($code | Where-Object { $_ -notmatch '(?i)(^Wideska/.*\.(cs|xaml|png|ico|svg)$)' }).Count) { $selectedSuite = 'full' }
         }
+        if ($code.Count -gt 0 -and @($code | Where-Object { $_ -notmatch '(?i)^Wideska(?:\.Tests)?/(?:Models/|ViewModels/|Views/)?TaskBoard[^/]*\.(cs|xaml)$' }).Count -eq 0) { $selectedSuite = 'tasks' }
         Write-Host ('Changed files: ' + ($files -join ', '))
     }
     Write-Host "Selected suite: $selectedSuite"
