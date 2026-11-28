@@ -9,6 +9,7 @@ building or running anything. Use `-BaseRef` to select another comparison branch
 | --- | --- |
 | Documentation only | Whitespace check; no build or application tests |
 | Providers, models, storage and services | `-Suite quick` |
+| Task board model or view in isolation | `-Suite tasks` |
 | XAML, controls, navigation, scrolling, localization, native window behavior | `-Suite ui` |
 | Idle return, shared test infrastructure, project configuration, broad changes or release | `-Suite full` |
 | GPU, CPU or memory investigation explicitly requested | `-Suite stress` |
@@ -28,6 +29,8 @@ Running the test executable without arguments selects **quick**. Use `--suite fu
 to reproduce the previous complete regression run. `--list` lists the modes.
 Screenshots are optional: add `-Previews` (or `--previews` to the executable).
 Rendering and pixel assertions still run without exporting preview PNG files.
+The `tasks` suite covers task transitions, encrypted persistence, failure recovery
+and both task-board sizes without waiting for calendar animations or idle timers.
 `--desktop-smoke` explicitly adds the desktop visibility exercise, which can
 temporarily minimize application windows. Do not enable it routinely.
 

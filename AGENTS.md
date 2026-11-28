@@ -2,13 +2,13 @@
 
 ## 1. Project Overview
 
-- **Product:** Wideska
+- **Product:** Vedeska Widget (working name; technical identifiers remain Wideska)
 - **Repository:** wideska-calendar-widget
 - **Platform:** Windows
 - **License:** MIT
-- **Type:** Open-source desktop calendar widget.
+- **Type:** Open-source personal planning desktop widgets.
 
-Wideska is a lightweight, customizable desktop calendar widget designed to display calendar events directly on the Windows desktop without requiring a separate calendar application.
+Vedeska Widget combines a desktop calendar with an independent Eisenhower task board. Preserve existing Wideska executable names, storage paths and OAuth configuration during prototyping. Task scheduling into the calendar is a future integration, not part of the task-board prototype.
 
 ## 2. Functional Requirements
 
