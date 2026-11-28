@@ -2,13 +2,13 @@
 
 ## 1. Project Overview
 
-- **Product:** Vedeska Widget (working name; technical identifiers remain Wideska)
+- **Product:** Wideska Widget
 - **Repository:** wideska-calendar-widget
 - **Platform:** Windows
 - **License:** MIT
 - **Type:** Open-source personal planning desktop widgets.
 
-Vedeska Widget combines a desktop calendar with an independent Eisenhower task board. Preserve existing Wideska executable names, storage paths and OAuth configuration during prototyping. Task scheduling into the calendar is a future integration, not part of the task-board prototype.
+Wideska Widget combines a desktop calendar with an independent Eisenhower task board. Preserve existing Wideska executable names, storage paths and OAuth configuration during prototyping. Task scheduling into the calendar is a future integration, not part of the task-board prototype.
 
 ## 2. Functional Requirements
 
