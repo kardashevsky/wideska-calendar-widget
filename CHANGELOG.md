@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- After ten seconds without widget input, gently return to today's schedule without taking focus; place current time one third down the time grid and retain two thirds for upcoming events.
+- Pause automatic navigation while reading event details, editing settings or dragging; cancel it immediately on new input and return month/year views to the current period.
 - Give event details a responsive 640-pixel reading width and retain description paragraphs, emphasis, lists and safe links using native WPF text instead of stripping HTML formatting.
 - Keep only the date header's top corners rounded so its lower edge joins the calendar grid seamlessly.
 - End the timeline at the final midnight label without trailing shaded space; use uniform one-pixel grid strokes at the current DPI.

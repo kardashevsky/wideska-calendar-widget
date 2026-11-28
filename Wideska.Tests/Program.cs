@@ -99,7 +99,7 @@ internal static partial class Program
             await vm.RefreshAsync();
             // Load actual compiled XAML and render every view, including both themes and minimum dimensions.
             app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Wideska;component/Resources/Styles.xaml") });
-            var window = new Wideska.MainWindow(vm, false) { Width = 960, Height = 680 };
+            var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 960, Height = 680 };
             int bindingErrors = 0;
             var listener = new BindingListener(() => bindingErrors++);
             System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add(listener);
@@ -160,6 +160,7 @@ internal static partial class Program
             var saved = await store.ReadAsync<WidgetSettings>("settings.bin", true);
             Check(saved?.View == CalendarView.Month, "Settings must persist");
             await TestOnboardingAsync(app, directory);
+            await TestIdleReturnAsync(app, directory);
             await TestTimeIndicatorAsync(app, directory);
             await TestAuditRegressionsAsync(app, directory);
         }
