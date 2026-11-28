@@ -89,6 +89,7 @@ internal static partial class Program
         SavePreview(window, "event-details", true);
         vm.CloseEventCommand.Execute(null);
         Check(!vm.IsEventOpen && vm.IsCalendarEnabled, "Closing details must restore calendar interaction");
+        await TestRichEventDetailsAsync(app, window, vm, provider);
         vm.FitDesktopCommand.Execute(null);
         Check(vm.IsDesktopFilled && !vm.CanMoveWidget && vm.WidgetCornerRadius.TopLeft == 0 && vm.CanEditGeometry, "Desktop fill must square corners and prevent dragging while permitting resize to exit");
         vm.FitDesktopCommand.Execute(null);
