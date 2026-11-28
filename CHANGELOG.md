@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Slide frozen calendar snapshots for period navigation and Show Today without animating the live calendar layout; retain the displayed composition during rapid navigation and release both snapshots on completion, hide or resize.
 - Dim past calendar days and their events without blocking interaction; use the selected calendar time zone and preserve today's highlighting.
 - Animate wheel scrolling through retained visual translation without arranging or redrawing the calendar each frame; commit the native offset only when movement finishes.
 - Keep the sticky header, event hit targets and scrollbar aligned during movement; preserve native input when Windows animations are disabled.

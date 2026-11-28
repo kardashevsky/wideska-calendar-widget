@@ -144,6 +144,8 @@ internal static partial class Program
                 Check(Math.Max(snapshot.PixelWidth, snapshot.PixelHeight) <= 2048, "Large-screen navigation snapshots must be capped at 2048 pixels per side");
                 window.Hide();
                 Check(outgoing.Source is null, "Hiding the widget mid-transition must immediately release its snapshot");
+                Check(((Image)window.FindName("IncomingCalendar")).Source is null,
+                    "Hiding the widget must also release the incoming snapshot");
             }
             window.Close();
 

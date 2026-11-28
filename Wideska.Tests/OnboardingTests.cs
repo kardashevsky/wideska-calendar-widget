@@ -159,6 +159,7 @@ internal static partial class Program
                 "Rapid navigation must finish with a fully visible calendar and release transition snapshots");
         }
         await TestTodayNavigationAsync(app, window);
+        await TestCarouselPerformanceAsync(app, window);
         vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
