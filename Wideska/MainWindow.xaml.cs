@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private Point? dragPoint;
     private bool changingGeometryMode;
     private int transitionVersion;
+    private bool pendingPeriodTransition;
+    private double pendingPeriodDirection;
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     public MainWindow() : this(CreateViewModel(), true) { }
     private static MainViewModel CreateViewModel()
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
     }
     private void StopNavigationTransition()
     {
+        pendingPeriodTransition = false;
         ++transitionVersion;
         if (CalendarContent is null || OutgoingCalendar is null) return;
         CalendarContent.RenderTransform.BeginAnimation(TranslateTransform.XProperty, null);
@@ -146,8 +149,17 @@ public partial class MainWindow : Window
     private void BeginPeriodTransition(double direction)
     {
         if (!SystemParameters.ClientAreaAnimation || CalendarContent.ActualWidth < 1 || CalendarContent.ActualHeight < 1) return;
-        // Preserve the currently displayed composition when navigation interrupts an earlier slide.
-        var outgoingSnapshot = CaptureCalendar(OutgoingCalendar.Visibility == Visibility.Visible ? CalendarTransitionSurface : CalendarContent);
+        if (OutgoingCalendar.Visibility == Visibility.Visible)
+        {
+            // Commands still process every click; retain only one transition to the latest requested period.
+            pendingPeriodTransition = true;
+            pendingPeriodDirection = direction;
+            return;
+        }
+        StartPeriodTransition(direction, CaptureCalendar(CalendarContent));
+    }
+    private void StartPeriodTransition(double direction, System.Windows.Media.Imaging.BitmapSource outgoingSnapshot)
+    {
         StopNavigationTransition();
         int version = transitionVersion;
         double distance = CalendarContent.ActualWidth;
@@ -159,9 +171,13 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
             if (version != transitionVersion || !IsVisible) return;
+            // Clicks before layout is ready are already represented by this incoming snapshot.
+            if (pendingPeriodTransition) direction = pendingPeriodDirection;
+            pendingPeriodTransition = false;
             CalendarContent.Opacity = 1;
             CalendarContent.UpdateLayout();
             IncomingCalendar.Source = CaptureCalendar(CalendarContent);
+            DateTime incomingDate = model.NavigationDate;
             CalendarContent.Opacity = 0;
             IncomingCalendar.Visibility = Visibility.Visible;
             var duration = TimeSpan.FromMilliseconds(300);
@@ -178,7 +194,14 @@ public partial class MainWindow : Window
             var outgoingSlide = Motion(0, -direction * distance);
             outgoingSlide.Completed += (_, _) =>
             {
-                if (version == transitionVersion) StopNavigationTransition();
+                if (version != transitionVersion) return;
+                bool followUp = pendingPeriodTransition;
+                int dateDirection = model.NavigationDate.CompareTo(incomingDate);
+                double nextDirection = dateDirection == 0 ? pendingPeriodDirection : Math.Sign(dateDirection);
+                var nextOutgoing = IncomingCalendar.Source as System.Windows.Media.Imaging.BitmapSource;
+                StopNavigationTransition();
+                if (followUp && nextOutgoing is not null && IsVisible)
+                    StartPeriodTransition(nextDirection, nextOutgoing);
             };
             ((TranslateTransform)OutgoingCalendar.RenderTransform).BeginAnimation(TranslateTransform.XProperty, outgoingSlide);
         });

@@ -154,12 +154,13 @@ internal static partial class Program
             Check(Math.Abs(calendarContent.ActualHeight - transitionHeight) < .5, "Carousel snapshot must not change calendar layout height during navigation");
             previous.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, previous));
             vm.PreviousCommand.Execute(null);
-            await Task.Delay(500);
+            await Task.Delay(750);
             Check(outgoing.Source is null && outgoing.Visibility == Visibility.Collapsed && Math.Abs(((TranslateTransform)calendarContent.RenderTransform).X) < .01 && Math.Abs(calendarContent.Opacity - 1) < .01,
                 "Rapid navigation must finish with a fully visible calendar and release transition snapshots");
         }
         await TestTodayNavigationAsync(app, window);
         await TestCarouselPerformanceAsync(app, window);
+        await TestRapidNavigationAsync(app, window);
         vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
