@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Product>Vedeska Widget</Product>
+    <Product>Wideska Widget</Product>
     <Description>Desktop widgets for personal planning: calendar and task prioritization.</Description>
     <Version>0.2.0</Version>
     <Nullable>enable</Nullable>

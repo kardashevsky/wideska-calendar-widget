@@ -11,7 +11,7 @@ internal static partial class Program
 {
     private static async Task RunTaskBoardSuiteAsync(Application app)
     {
-        string directory = Path.Combine(Path.GetTempPath(), "Vedeska-tasks-tests-" + Guid.NewGuid().ToString("N"));
+        string directory = Path.Combine(Path.GetTempPath(), "Wideska-tasks-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try { await TestTaskBoardAsync(app, directory, true); }
         finally { Directory.Delete(directory, true); }

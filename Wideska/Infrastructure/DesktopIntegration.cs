@@ -76,7 +76,7 @@ public sealed class DesktopIntegration : IDisposable
         Host = new DesktopHost(window);
         try
         {
-            icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Vedeska Widget", Info = "", Title = "" };
+            icon = new() { Size = Marshal.SizeOf<NotifyIconData>(), Window = handle, Id = 1, Flags = 7, Callback = CallbackMessage, Icon = ApplicationIcon.LoadTrayIcon(handle), Tip = "Wideska Widget", Info = "", Title = "" };
             if (!Shell_NotifyIcon(0, ref icon)) throw new InvalidOperationException("Unable to create the system tray icon.");
         }
         catch

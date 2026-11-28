@@ -1,6 +1,6 @@
-# Vedeska Widget
+# Wideska Widget
 
-An MIT-licensed collection of Windows desktop widgets for personal planning: a calendar and an Eisenhower task matrix. Built with C#, .NET 10, WPF and MVVM, without third-party runtime packages. Vedeska Widget is the working product name; existing Wideska executable names, data paths, OAuth configuration and repository URLs remain compatible during prototyping.
+An MIT-licensed collection of Windows desktop widgets for personal planning: a calendar and an Eisenhower task matrix. Built with C#, .NET 10, WPF and MVVM, without third-party runtime packages. The product name is Wideska Widget. Existing executable names, data paths, OAuth configuration and repository URLs remain compatible.
 
 ## Task matrix prototype
 
@@ -31,7 +31,7 @@ failed task writes are shown with a Retry action.
 This prototype does not yet schedule tasks into Google Calendar, synchronize
 tasks across devices, reorder cards within a column or replace the current
 calendar. The repository and workspace folder have not been renamed. A future
-repository name can be `vedeska-widget` after the product name is settled.
+repository name can be `wideska-widget` to reflect both widgets.
 
 ## Download
 
