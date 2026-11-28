@@ -14,15 +14,18 @@ public sealed class LinkTextBlock : TextBlock
     private void UpdateInlines()
     {
         Inlines.Clear();
-        string text = ContentText ?? "";
+        AppendText(Inlines, ContentText ?? "");
+    }
+    internal static void AppendText(InlineCollection target, string text)
+    {
         if (text.Length > 65536) text = text[..65536] + "…";
         int position = 0;
         Match[] matches;
         try { matches = Links.Matches(text).Cast<Match>().Take(128).ToArray(); }
-        catch (RegexMatchTimeoutException) { Inlines.Add(new Run(text)); return; }
+        catch (RegexMatchTimeoutException) { target.Add(new Run(text)); return; }
         foreach (Match match in matches)
         {
-            Inlines.Add(new Run(text[position..match.Index]));
+            target.Add(new Run(text[position..match.Index]));
             string label = match.Value.TrimEnd('.', ',', ';', ':', '!', '?');
             int excessClosingBrackets = label.Count(c => c == ')') - label.Count(c => c == '(');
             while (label.EndsWith(')') && excessClosingBrackets-- > 0) label = label[..^1];
@@ -31,12 +34,12 @@ public sealed class LinkTextBlock : TextBlock
             {
                 var link = new Hyperlink(new Run(label)) { NavigateUri = uri, ToolTip = address };
                 link.SetResourceReference(TextElement.ForegroundProperty, "Accent");
-                Inlines.Add(link);
+                target.Add(link);
             }
-            else Inlines.Add(new Run(label));
-            Inlines.Add(new Run(match.Value[label.Length..]));
+            else target.Add(new Run(label));
+            target.Add(new Run(match.Value[label.Length..]));
             position = match.Index + match.Length;
         }
-        Inlines.Add(new Run(text[position..]));
+        target.Add(new Run(text[position..]));
     }
 }

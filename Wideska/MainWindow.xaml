@@ -151,7 +151,7 @@
                 <Button Command="{Binding CloseEventCommand}" Background="Transparent" Padding="0" Margin="0" BorderThickness="0" Focusable="False" ToolTip="{DynamicResource Ui.Backtocalendar}">
                     <Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"/></ControlTemplate></Button.Template>
                 </Button>
-                <Border DataContext="{Binding SelectedEvent}" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="22" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="EventDetailsCard" DataContext="{Binding SelectedEvent}" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="22" MaxWidth="640" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel Margin="0,0,0,16">
@@ -167,7 +167,7 @@
                                     <TextBlock Text="{DynamicResource Ui.LOCATION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Location}" FontSize="13"/>
                                 </StackPanel>
                                 <StackPanel Visibility="{Binding HasDescription, Converter={StaticResource VisibleIf}}">
-                                    <TextBlock Text="{DynamicResource Ui.DESCRIPTION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:LinkTextBlock ContentText="{Binding Description}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
+                                    <TextBlock Text="{DynamicResource Ui.DESCRIPTION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:RichDescriptionTextBlock ContentText="{Binding FormattedDescription}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>

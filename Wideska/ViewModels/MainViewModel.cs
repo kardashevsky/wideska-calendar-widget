@@ -17,11 +17,12 @@ public sealed class CalendarSelection(CalendarInfo calendar, bool visible, Actio
     public bool Visible { get => visible; set { if (Set(ref visible, value)) changed(); } }
 }
 public sealed record EventItem(string Title, string Time, string Color, string Details, bool AllDay = false, double StartMinute = 0, double EndMinute = 0,
-    string Description = "", string Location = "", string CalendarName = "", string DateLabel = "", string TimeZoneLabel = "", string EventId = "", string CalendarId = "")
+    string Description = "", string Location = "", string CalendarName = "", string DateLabel = "", string TimeZoneLabel = "", string EventId = "", string CalendarId = "", string DescriptionMarkup = "")
 {
     public bool IsSleepCalendar => string.Equals(CalendarName.Trim(), "Sleep", StringComparison.OrdinalIgnoreCase) || string.Equals(CalendarName.Trim(), "Сон", StringComparison.OrdinalIgnoreCase);
     public bool HasLocation => !string.IsNullOrWhiteSpace(Location);
     public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
+    public string FormattedDescription => string.IsNullOrEmpty(DescriptionMarkup) ? Description : DescriptionMarkup;
 }
 public sealed record DayCell(DateTime Date, bool InMonth, bool Today, IReadOnlyList<EventItem> Events)
 {
@@ -412,7 +413,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 DateTime last = e.AllDay ? e.End.Date.AddDays(-1) : end.Date;
                 string dateLabel = first == last ? first.ToString("D", AppLocalization.Culture) : $"{first.ToString("D", AppLocalization.Culture)} – {last.ToString("D", AppLocalization.Culture)}";
                 return new EventItem(e.Title, time, e.Color, $"{e.Title}\n{time}\n{e.Location}\n{preview}".Trim(), e.AllDay,
-                    startMinute, endMinute, description, e.Location, snapshot.Calendars.FirstOrDefault(c => c.Id == e.CalendarId)?.Name ?? "", dateLabel, CalendarTimeZoneLabel, e.Id, e.CalendarId);
+                    startMinute, endMinute, description, e.Location, snapshot.Calendars.FirstOrDefault(c => c.Id == e.CalendarId)?.Name ?? "", dateLabel, CalendarTimeZoneLabel, e.Id, e.CalendarId, e.Description);
             }).ToList();
         var today = CalendarTime.Local(currentTime, CalendarTimeZoneId).Date;
         return new(day, day.Month == month, day == today, events) { IsPast = day.Date < today };
