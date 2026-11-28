@@ -73,6 +73,7 @@ public sealed class DayTimeline : Control
     private readonly DrawingVisual timeBadge = new();
     private readonly DrawingVisual stickyHeader = new();
     private readonly DrawingVisual calendarBody = new();
+    private static readonly FontFamily ClockFont = new("Consolas");
     private double badgeY = double.NaN;
     public event Action? ViewportChanged;
     internal int TodayNavigationDirection
@@ -329,11 +330,11 @@ public sealed class DayTimeline : Control
     private const double DayHeaderHeight = 36;
     private const double AllDayRowHeight = 24;
     private double TimeStart(IReadOnlyList<DayCell> days) => DayHeaderHeight + Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay))) * AllDayRowHeight + 16;
-    private void Text(DrawingContext dc, string text, double x, double y, double width, double size = 12, Brush? brush = null, FontWeight? weight = null, TextAlignment alignment = TextAlignment.Left)
+    private void Text(DrawingContext dc, string text, double x, double y, double width, double size = 12, Brush? brush = null, FontWeight? weight = null, TextAlignment alignment = TextAlignment.Left, FontFamily? fontFamily = null)
     {
         if (width < 2) return;
         var formatted = new FormattedText(text, AppLocalization.Culture, FlowDirection.LeftToRight,
-            new Typeface(FontFamily, FontStyles.Normal, weight ?? FontWeights.Normal, FontStretches.Normal), size,
+            new Typeface(fontFamily ?? FontFamily, FontStyles.Normal, weight ?? FontWeights.Normal, FontStretches.Normal), size,
             brush ?? Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip)
         { MaxTextWidth = Math.Max(1, width), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis, TextAlignment = alignment };
         dc.DrawText(formatted, new Point(x, y));
@@ -475,9 +476,9 @@ public sealed class DayTimeline : Control
     {
         using var dc = timeBadge.RenderOpen();
         if (double.IsNaN(badgeY)) return;
-        dc.DrawRoundedRectangle(NowBrush, null, new Rect(3, badgeY - 11, 76, 22), 7, 7);
+        dc.DrawRoundedRectangle(NowBrush, null, new Rect(3, badgeY - 11, 66, 22), 7, 7);
         string text = string.IsNullOrEmpty(ClockText) ? CalendarTime.Local(CurrentTime, TimeZoneId).ToString("HH:mm:ss") : ClockText;
-        Text(dc, text, 6, badgeY - 8, 70, 11, Brushes.White, FontWeights.SemiBold, TextAlignment.Center);
+        Text(dc, text, 9, badgeY - 7, 54, 11, Brushes.White, FontWeights.SemiBold, TextAlignment.Left, ClockFont);
     }
     private void Event(DrawingContext dc, EventItem item, Rect rect, bool timed)
     {
