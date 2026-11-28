@@ -50,6 +50,7 @@ internal static partial class Program
                 "Native scrolling must not add any delayed animation or snapping");
             savedOffset = settledOffset;
         }
+        await TestVisualScrollingAsync(app, window, timeline, viewer);
         SavePreview(window, "sticky-day-header", true);
     }
 }
