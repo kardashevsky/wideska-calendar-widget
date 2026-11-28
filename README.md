@@ -99,7 +99,7 @@ Calendar data goes only to the Google Calendar API. There is no application tele
 
 ```powershell
 dotnet build Wideska/Wideska.slnx -c Release
-.\Wideska.Tests\bin\Release\net10.0-windows\Wideska.Tests.exe
+.\Wideska.Tests\Test.ps1
 ```
 
 This standalone test executable has no test framework dependency. It exits nonzero on failure. It checks calendar ranges, leap days, event overlap, exclusive all-day ends, visibility, caching, offline behavior, DPAPI persistence, Google pagination, recurring instance requests, token refresh and API errors. It loads the compiled XAML, renders all six views, checks binding errors, minimum window dimensions and light/dark resources. It also checks authorization-first launch, rejected consent, expired sessions, Desktop OAuth JSON import, taskbar absence, custom resizing and rendered pixel alpha. Native-message tray tests cover opening the menu while hidden, every menu action, off-screen recovery, desktop-mode reveal and the existing-instance show request. Preview PNGs are written to the ignored `artifacts` directory; wallpaper previews use a synthetic background only in the test harness. Tests briefly display an isolated window and tray icon with synthetic data, and exercise native window ordering. They do not read your Wideska settings, use your Google account or change startup registration.
@@ -117,6 +117,6 @@ For an interactive shell check, run the test EXE with `--desktop-smoke`. It temp
 - `Infrastructure`: observable properties, commands, tray, startup and window ordering.
 - `Resources`: shared XAML brushes, styles and event/day templates.
 - `MainWindow`: the WPF view and window lifecycle integration.
-- `Wideska.Tests`: isolated logic, protocol and rendering checks.
+- `Wideska.Tests`: isolated logic, protocol and rendering checks. See [TESTING.md](TESTING.md) for selective verification.
 
 Additional providers implement `ICalendarProvider` without depending on the presentation layer.

@@ -174,8 +174,8 @@ For every development task:
 10. Review the final changes.
 11. Push the task branch.
 12. Merge the task branch into `develop` after successful verification.
-After merging into develop, build the application
-and run relevant tests again.
+After merging into develop, follow the verification reuse policy in TESTING.md.
+Rebuild and rerun affected tests only if the merged tree differs from the validated tree.
 
 Do not push develop if post-merge verification fails.
 13. Push the updated `develop` branch.
@@ -286,8 +286,8 @@ Before implementing a task:
 After implementing a task:
 
 1. Review the modified files.
-2. Build the application.
-3. Run relevant tests when available.
+2. Build the application when source, resources or project inputs changed.
+3. Run the relevant suite following TESTING.md; documentation-only changes need no build.
 4. Resolve errors introduced by the changes.
 5. Report the implemented changes, build results and remaining issues.
 
@@ -304,3 +304,13 @@ Do not claim successful implementation or testing unless verified.
 - Obtain explicit approval before introducing major dependencies or architectural changes.
 - Report technical limitations and unresolved problems.
 - Prioritize stability, maintainability, security and performance.
+
+## 12. Proportionate Verification
+
+- Follow TESTING.md and use Wideska.Tests/Test.ps1 -Plan to review automatic selection.
+- Default to quick checks; use UI checks for presentation changes and full checks for idle timers, shared infrastructure, broad changes and releases.
+- Never run GPU/resource stress diagnostics unless explicitly requested for a performance investigation.
+- Export screenshots only when visual review requires them.
+- Do not add tests that merely duplicate a reversible visual constant.
+- Reuse successful verification after a merge only when git diff proves the validated and merged trees identical and dependencies, toolchain and environment are unchanged.
+- Repeat checks after relevant edits, failures or unresolved concerns; report skipped checks honestly.

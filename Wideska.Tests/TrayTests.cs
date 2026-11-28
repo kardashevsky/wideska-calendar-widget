@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -29,6 +29,7 @@ internal static partial class Program
         menuImage.Render(desktop.TrayMenu);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(menuImage));
         System.IO.Directory.CreateDirectory("artifacts");
+        if (savePreviews)
         using (var file = System.IO.File.Create("artifacts/tray-menu.png")) encoder.Save(file);
         void Click(string label) => desktop.TrayMenu.Items.OfType<MenuItem>().Single(i => (string)i.Tag == label).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Click("Show widget"); Check(window.IsVisible, "Show menu action");
