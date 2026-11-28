@@ -34,6 +34,9 @@ internal static partial class Program
             && ReferenceEquals(timeline.EventAt(new Point(184, 48)), allDay),
             "Shading must retain timed and all-day event hit targets");
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var output = File.Create("artifacts/past-day-shading.png"); encoder.Save(output);
+        if (savePreviews)
+        {
+            using var output = File.Create("artifacts/past-day-shading.png"); encoder.Save(output);
+        }
     }
 }

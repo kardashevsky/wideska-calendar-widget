@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -12,6 +12,7 @@ internal static partial class Program
 {
     private static void SavePreview(Window window, string name, bool wallpaper = false)
     {
+        if (!savePreviews) return;
         window.UpdateLayout();
         int width = (int)window.ActualWidth;
         int height = (int)window.ActualHeight;
@@ -145,7 +146,8 @@ internal static partial class Program
             next.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, next));
             var captured = (System.Windows.Media.Imaging.BitmapSource)outgoing.Source;
             var snapshotEncoder = new PngBitmapEncoder(); snapshotEncoder.Frames.Add(BitmapFrame.Create(captured));
-            using (var snapshotFile = File.Create("artifacts/outgoing-snapshot.png")) snapshotEncoder.Save(snapshotFile);
+            if (savePreviews)
+                using (var snapshotFile = File.Create("artifacts/outgoing-snapshot.png")) snapshotEncoder.Save(snapshotFile);
             var headerPixel = new byte[4];
             captured.CopyPixels(new Int32Rect((int)(captured.PixelWidth * .5), (int)(8 * captured.DpiY / 96), 1, 1), headerPixel, 4, 0);
             Check(headerPixel[3] > 200, "Outgoing snapshot must start with the pinned date header at its local top, without the widget header offset");

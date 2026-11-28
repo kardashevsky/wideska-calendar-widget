@@ -47,6 +47,9 @@ internal static partial class Program
         Check(shaded.Length == 1 && Math.Abs(shaded[0].Geometry.Bounds.Bottom - timeline.ActualHeight) < .01
             && DayTimeline.TimelineBottomPadding == 0, "Past-day shading must stop exactly at the final midnight boundary without a trailing strip");
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var file = File.Create("artifacts/short-event-readability.png"); encoder.Save(file);
+        if (savePreviews)
+        {
+            using var file = File.Create("artifacts/short-event-readability.png"); encoder.Save(file);
+        }
     }
 }
