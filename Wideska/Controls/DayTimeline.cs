@@ -455,8 +455,12 @@ public sealed class DayTimeline : Control
         Brush background = SurfaceBrush;
         if (SurfaceBrush is SolidColorBrush solid) background = new SolidColorBrush(Color.FromRgb(solid.Color.R, solid.Color.G, solid.Color.B));
         var headerBounds = new Rect(TimeGutterWidth, 0, Math.Max(0, ActualWidth - TimeGutterWidth), headerHeight);
-        dc.PushClip(new RectangleGeometry(headerBounds, 10, 10));
-        dc.DrawRoundedRectangle(background, null, headerBounds, 10, 10);
+        var headerClip = new GeometryGroup { FillRule = FillRule.Nonzero };
+        headerClip.Children.Add(new RectangleGeometry(headerBounds, 10, 10));
+        headerClip.Children.Add(new RectangleGeometry(new Rect(headerBounds.X, headerHeight - 10, headerBounds.Width, 10)));
+        headerClip.Freeze();
+        dc.PushClip(headerClip);
+        dc.DrawRectangle(background, null, headerBounds);
         drawingHeader = true;
         try
         {
