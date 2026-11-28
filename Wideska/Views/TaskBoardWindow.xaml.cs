@@ -52,6 +52,7 @@ public partial class TaskBoardWindow : Window
                     host.SetBounds(new(area.X + 20, area.Y + 20, Math.Min(area.Width, 1080), Math.Min(area.Height, 620)));
                 }
                 host.RecoverToScreen();
+                host.RaiseWithinDesktop();
             }
             catch (Exception ex) { host?.Dispose(); host = null; MessageBox.Show(ex.Message, "Wideska Widget", MessageBoxButton.OK, MessageBoxImage.Warning); }
         }
@@ -63,6 +64,16 @@ public partial class TaskBoardWindow : Window
     public void RefreshLanguage()
     {
         foreach (var column in model.Columns) column.RefreshLabels();
+    }
+    public void ShowWidget()
+    {
+        RefreshLanguage();
+        Show();
+        if (host?.IsAttached == true)
+        {
+            host.RecoverToScreen();
+            host.RaiseWithinDesktop();
+        }
     }
     private async void OnClosing(object? sender, CancelEventArgs e)
     {

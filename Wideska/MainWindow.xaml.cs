@@ -452,8 +452,7 @@ public partial class MainWindow : Window
             taskBoard = new Views.TaskBoardWindow(new TaskBoardViewModel(new LocalStore()));
             taskBoard.Closed += (_, _) => taskBoard = null;
         }
-        taskBoard.RefreshLanguage();
-        taskBoard.Show();
+        taskBoard.ShowWidget();
     }
     private async void Quit()
     {
