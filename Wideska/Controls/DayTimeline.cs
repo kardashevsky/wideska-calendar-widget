@@ -324,7 +324,7 @@ public sealed class DayTimeline : Control
             viewer.ScrollToVerticalOffset(Math.Max(0, local.TimeOfDay.TotalMinutes / 1440 * (ActualHeight - header - TimelineBottomPadding) - bodyViewport / 3));
         });
     }
-    public const double MinimumTimelineHeight = DayHeaderHeight + 3 * AllDayRowHeight + 16 + 24 * 76;
+    public const double MinimumTimelineHeight = 1480;
     public const double TimeGutterWidth = 84;
     public const double TimelineBottomPadding = 0;
     private const double DayHeaderHeight = 36;
@@ -535,7 +535,16 @@ public sealed class DayTimeline : Control
             }
             else if (rect.Height >= 20)
             {
-                Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + 3, width, Math.Max(0, rect.Height - 6)), 13, textBrush, FontWeights.Medium);
+                string time = (string.IsNullOrEmpty(item.Time) ? start : item.Time).Replace(" ", "");
+                double compactWidth = Math.Max(0, rect.Width - 12);
+                var timeLayout = new FormattedText(time, AppLocalization.Culture, FlowDirection.LeftToRight,
+                    new Typeface(FontFamily, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal), 11,
+                    textBrush, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                double timeWidth = Math.Min(compactWidth, Math.Ceiling(timeLayout.WidthIncludingTrailingWhitespace));
+                Title(dc, item.Title, new Rect(rect.X + 6, rect.Y + (rect.Height - FontFamily.LineSpacing * 13) / 2,
+                    Math.Max(0, compactWidth - timeWidth - 6), FontFamily.LineSpacing * 13), 13, textBrush, FontWeights.Medium);
+                Text(dc, time, rect.Right - 6 - timeWidth, rect.Y + (rect.Height - timeLayout.Height) / 2,
+                    timeWidth, 11, textBrush, FontWeights.Medium);
             }
         }
         dc.Pop(); (drawingHeader ? headerHits : hits).Add((rect, item.Details, item));

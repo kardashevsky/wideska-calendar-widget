@@ -34,7 +34,7 @@ internal static partial class Program
         }
         var drawings = Descendants(body).ToArray();
         string text = string.Concat(drawings.OfType<GlyphRunDrawing>().Select(d => new string(d.GlyphRun.Characters?.ToArray() ?? [])));
-        Check(text.Contains("Focus") && text.Contains("09:00 \u2013 09:30") && text.Contains("23:30 \u2013 00:00"),
+        Check(text.Contains("Focus") && text.Contains("09:00\u201309:30") && text.Contains("23:30\u201300:00"),
             "Half-hour cards must draw their complete start/end times even at the minimum column width and maximum all-day header height");
         var lineWidths = drawings.OfType<GeometryDrawing>().Where(d => d.Pen?.Brush == timeline.GridBrush || d.Pen?.Brush == timeline.AxisBrush)
             .Select(d => d.Pen!.Thickness).Distinct().ToArray();
