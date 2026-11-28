@@ -63,7 +63,8 @@
             </Border>
         </DataTemplate>
     </Window.Resources>
-    <Border Background="{DynamicResource WidgetGlass}" BorderBrush="{DynamicResource WidgetOutline}" BorderThickness="1" CornerRadius="12" Padding="10">
+    <AdornerDecorator>
+    <Border x:Name="BoardSurface" Background="{DynamicResource WidgetGlass}" BorderBrush="{DynamicResource WidgetOutline}" BorderThickness="1" CornerRadius="12" Padding="10">
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid Margin="6,3,6,13" Background="Transparent" MouseLeftButtonDown="OnHeaderDown" MouseMove="OnHeaderMove" MouseLeftButtonUp="OnHeaderUp">
@@ -97,4 +98,5 @@
             </Thumb>
         </Grid>
     </Border>
+    </AdornerDecorator>
 </Window>
