@@ -13,7 +13,7 @@ namespace Wideska.Views;
 
 public partial class TaskBoardWindow : Window
 {
-    private const string DragFormat = "Vedeska.TaskId";
+    private const string DragFormat = "Wideska.TaskId";
     private readonly TaskBoardViewModel model;
     private readonly bool attachToDesktop;
     private DesktopHost? host;
@@ -53,7 +53,7 @@ public partial class TaskBoardWindow : Window
                 }
                 host.RecoverToScreen();
             }
-            catch (Exception ex) { host?.Dispose(); host = null; MessageBox.Show(ex.Message, "Vedeska Widget", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            catch (Exception ex) { host?.Dispose(); host = null; MessageBox.Show(ex.Message, "Wideska Widget", MessageBoxButton.OK, MessageBoxImage.Warning); }
         }
     }
     private void CapturePlacement()
