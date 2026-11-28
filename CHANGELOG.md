@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove the empty dark header corner above the time axis; give the date strip soft edges and subtle separators, and align the period heading with the timeline axis.
 - Keep a stationary transparent input surface over empty calendar slots so wheel events cannot fall through to native scrolling during visual movement.
 - Coalesce rapid period navigation into one follow-up carousel transition while retaining every requested date change; reuse clean snapshots instead of recapturing moving layers.
 - Slide frozen calendar snapshots for period navigation and Show Today without animating the live calendar layout; retain the displayed composition during rapid navigation and release both snapshots on completion, hide or resize.

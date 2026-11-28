@@ -28,8 +28,8 @@ internal static partial class Program
                 "Show today must appear when navigating away from today");
             var header = (FrameworkElement)window.FindName("CalendarHeader");
             var heading = (FrameworkElement)window.FindName("HeaderPeriod");
-            Check(Math.Abs(heading.TranslatePoint(new Point(), header).X) < .5,
-                "The period heading must stay aligned to the left edge independently of the navigation controls");
+            Check(Math.Abs(heading.TranslatePoint(new Point(), header).X + header.Margin.Left - Wideska.Controls.DayTimeline.TimeGutterWidth) < .5,
+                "The period heading must align with the timeline axis independently of the navigation controls");
             var previous = (Button)window.FindName("PreviousPeriodButton");
             Check(Math.Abs(previous.TranslatePoint(new Point(), header).X - todayButton.TranslatePoint(new Point(todayButton.ActualWidth, 0), header).X - 8) < .5,
                 "Show today must sit immediately to the left of the previous-period arrow");

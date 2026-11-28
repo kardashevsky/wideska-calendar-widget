@@ -27,6 +27,7 @@ internal static partial class Program
         byte[] Pixel(int x, int y) { var value = new byte[4]; bitmap.CopyPixels(new Int32Rect(x, y, 1, 1), value, 4, 0); return value; }
         int eventY = (int)(76 + (1800 - 76 - DayTimeline.TimelineBottomPadding) * 690d / 1440);
         var past = Pixel(184, eventY); var today = Pixel(384, eventY); var future = Pixel(584, eventY);
+        Check(Pixel(30, 12)[3] == 0, "The unused header above the time gutter must remain transparent");
         Check(past[0] < future[0] && past[1] < future[1], "Past event cards must render darker than future cards");
         Check(today.SequenceEqual(future), "Today's event colors must remain unchanged");
         Check(ReferenceEquals(timeline.EventAt(new Point(184, eventY)), timed)
