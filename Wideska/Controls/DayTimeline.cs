@@ -324,9 +324,9 @@ public sealed class DayTimeline : Control
             viewer.ScrollToVerticalOffset(Math.Max(0, local.TimeOfDay.TotalMinutes / 1440 * (ActualHeight - header - TimelineBottomPadding) - bodyViewport / 3));
         });
     }
-    public const double MinimumTimelineHeight = 1480;
+    public const double MinimumTimelineHeight = DayHeaderHeight + 3 * AllDayRowHeight + 16 + 24 * 76;
     public const double TimeGutterWidth = 84;
-    public const double TimelineBottomPadding = 32;
+    public const double TimelineBottomPadding = 0;
     private const double DayHeaderHeight = 36;
     private const double AllDayRowHeight = 24;
     private double TimeStart(IReadOnlyList<DayCell> days) => DayHeaderHeight + Math.Min(3, days.Max(d => d.Events.Count(e => e.AllDay))) * AllDayRowHeight + 16;
@@ -371,7 +371,11 @@ public sealed class DayTimeline : Control
         double? nowMinutes = today < 0 ? null : CalendarTime.IndicatorMinutes(days[today].Date, CurrentTime, TimeZoneId);
         double nowY = nowMinutes is null ? -100 : startY + nowMinutes.Value / 1440 * timelineHeight;
         double axisX = TimeGutterWidth;
-        var gridPen = new Pen(GridBrush, 1);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double horizontalThickness = 1 / dpi.DpiScaleY;
+        double verticalThickness = 1 / dpi.DpiScaleX;
+        var gridPen = new Pen(GridBrush, horizontalThickness);
+        var verticalGridPen = new Pen(GridBrush, verticalThickness);
         if (days.Count > 1 && today >= 0)
         {
             dc.PushOpacity(.035);
@@ -389,19 +393,35 @@ public sealed class DayTimeline : Control
                 dc.Pop();
             }
         }
-        dc.DrawLine(new Pen(AxisBrush, 1.25), new Point(axisX, startY), new Point(axisX, ActualHeight - TimelineBottomPadding));
+        var guidelines = new GuidelineSet();
+        for (int i = 0; i <= days.Count; i++)
+        {
+            double x = TimeGutterWidth + i * column;
+            guidelines.GuidelinesX.Add(x - verticalThickness / 2);
+            guidelines.GuidelinesX.Add(x + verticalThickness / 2);
+        }
+        for (int hour = 0; hour <= 24; hour++)
+        {
+            double y = startY + timelineHeight * hour / 24;
+            guidelines.GuidelinesY.Add(y - horizontalThickness / 2);
+            guidelines.GuidelinesY.Add(y + horizontalThickness / 2);
+        }
+        dc.PushGuidelineSet(guidelines);
+        dc.DrawLine(new Pen(AxisBrush, verticalThickness), new Point(axisX, startY), new Point(axisX, ActualHeight - TimelineBottomPadding));
         for (int hour = 0; hour <= 24; hour++)
         {
             double y = startY + timelineHeight * hour / 24;
             dc.DrawLine(gridPen, new Point(TimeGutterWidth, y), new Point(ActualWidth, y));
-            dc.DrawLine(new Pen(AxisBrush, 1), new Point(axisX - 4, y), new Point(TimeGutterWidth, y));
+            dc.DrawLine(new Pen(AxisBrush, horizontalThickness), new Point(axisX - 4, y), new Point(TimeGutterWidth, y));
             if (Math.Abs(y - nowY) > 15)
-                Text(dc, $"{hour % 24:00}:00", 3, hour == 0 ? y + 4 : y - 8, axisX - 13, 12, MutedBrush, FontWeights.Medium, TextAlignment.Right);
+                Text(dc, $"{hour % 24:00}:00", 3, hour == 0 ? y + 4 : hour == 24 ? y - 18 : y - 8, axisX - 13, 12, MutedBrush, FontWeights.Medium, TextAlignment.Right);
         }
+        for (int index = 1; index < days.Count; index++)
+            dc.DrawLine(verticalGridPen, new Point(TimeGutterWidth + index * column, startY), new Point(TimeGutterWidth + index * column, ActualHeight));
+        dc.Pop();
         for (int index = 0; index < days.Count; index++)
         {
             var day = days[index]; double x = TimeGutterWidth + index * column;
-            if (index > 0) dc.DrawLine(gridPen, new Point(x, startY), new Point(x, ActualHeight - TimelineBottomPadding));
             foreach (var item in TimelineLayout.Arrange(day.Events))
             {
                 double inset = index == 0 ? 2 : 8;
@@ -409,11 +429,11 @@ public sealed class DayTimeline : Control
                 double top = startY + Math.Clamp(item.Event.StartMinute, 0, 1440) / 1440 * timelineHeight;
                 double bottom = startY + Math.Clamp(item.Event.EndMinute, 0, 1440) / 1440 * timelineHeight;
                 if (bottom <= top) continue;
-                var rect = new Rect(x + inset + item.HorizontalOffset * availableWidth, top + 2, Math.Max(1, availableWidth * item.WidthFraction - 2), Math.Max(2, bottom - top - 6));
+                var rect = new Rect(x + inset + item.HorizontalOffset * availableWidth, top + 2, Math.Max(1, availableWidth * item.WidthFraction - 2), Math.Max(2, bottom - top - 4));
                 Event(dc, item.Event, rect, true);
             }
             if (day.IsPast)
-                dc.DrawRectangle(PastDayShade, null, new Rect(x, startY, column, ActualHeight - startY));
+                dc.DrawRectangle(PastDayShade, null, new Rect(x, startY, column, timelineHeight));
         }
         // The live-time badge and line remain visually distinct from event-start accents.
         if (today >= 0 && nowMinutes is not null)
@@ -501,16 +521,17 @@ public sealed class DayTimeline : Control
         {
             string start = TimeSpan.FromMinutes(Math.Clamp(item.StartMinute, 0, 1440)).ToString(@"hh\:mm");
             double width = Math.Max(0, rect.Width - 20);
-            if (rect.Height >= 36 && width >= 2)
+            if (rect.Height >= 34 && width >= 2)
             {
-                double top = rect.Height >= 46 ? 7 : 3;
-                double titleHeight = Math.Max(12, rect.Height - top - 24);
+                bool compact = rect.Height < 46;
+                double top = compact ? 2 : 7;
+                double titleHeight = compact ? FontFamily.LineSpacing * 13 : Math.Max(12, rect.Height - top - 24);
                 var title = EventTitle.Layout(item.Title, new Typeface(FontFamily, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal),
                     textBrush, width, titleHeight, 13, VisualTreeHelper.GetDpi(this).PixelsPerDip);
                 Title(dc, item.Title, new Rect(rect.X + 10, rect.Y + top, width, titleHeight), 13, textBrush, FontWeights.Medium);
-                double timeY = rect.Y + top + Math.Min(title.Height, titleHeight) + 3;
+                double timeY = rect.Y + top + Math.Min(title.Height, titleHeight) + (compact ? 0 : 3);
                 string time = string.IsNullOrEmpty(item.Time) ? start : item.Time;
-                Text(dc, time, rect.X + 10, timeY, width, 12, textBrush, FontWeights.Medium);
+                Text(dc, time, rect.X + 10, timeY, width, compact ? 11 : 12, textBrush, FontWeights.Medium);
             }
             else if (rect.Height >= 20)
             {

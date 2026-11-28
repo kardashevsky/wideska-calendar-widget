@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- End the timeline at the final midnight label without trailing shaded space; use uniform one-pixel grid strokes at the current DPI.
+- Give hourly slots enough height for half-hour cards to show a title and full time range on separate lines without overlapping adjacent events.
 - Narrow the live-time badge and left-align its monospaced clock so ticking seconds cannot shift the text.
 - Remove the empty dark header corner above the time axis; give the date strip soft edges and subtle separators, and align the period heading with the timeline axis.
 - Keep a stationary transparent input surface over empty calendar slots so wheel events cannot fall through to native scrolling during visual movement.
