@@ -41,7 +41,7 @@
                         </ItemsControl>
                     </Grid>
                     <ScrollViewer Style="{StaticResource CalendarScrollViewer}" ClipToBounds="True" Visibility="{Binding IsDays, Converter={StaticResource VisibleIf}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <controls:DayTimeline x:Name="Timeline" ClockText="{Binding ClockText}" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" TodayHeaderBrush="{DynamicResource TimelineTodayHeader}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
+                        <controls:DayTimeline x:Name="Timeline" ClockText="{Binding ClockText}" EventCommand="{Binding OpenEventCommand}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource TimelineHeight}}" Days="{Binding Days}" CurrentTime="{Binding CurrentTime}" TimeZoneId="{Binding CalendarTimeZoneId}" Foreground="{DynamicResource Text}" GridBrush="{DynamicResource TimelineGrid}" SurfaceBrush="{DynamicResource TimelineCard}" MutedBrush="{DynamicResource TimelineMuted}" AxisBrush="{DynamicResource TimelineAxis}" AccentBrush="{DynamicResource Accent}" TodayHeaderBrush="{DynamicResource TimelineTodayHeader}" PastDayShade="{DynamicResource PastDayShade}" NowBrush="{DynamicResource TimelineNow}" WeekendBrush="{DynamicResource Weekend}" MinWidth="{Binding Columns, Converter={StaticResource TimelineWidth}}"/>
                     </ScrollViewer>
                     <Grid Visibility="{Binding IsYear, Converter={StaticResource VisibleIf}}">
                         <Viewbox Stretch="Uniform" MaxWidth="1440" HorizontalAlignment="Center" VerticalAlignment="Top">
@@ -64,7 +64,8 @@
                     </Viewbox>
                     </Grid>
                 </Grid>
-                <Canvas Grid.Row="2" IsHitTestVisible="False" ClipToBounds="True">
+                <Canvas x:Name="CalendarTransitionSurface" Grid.Row="2" IsHitTestVisible="False" ClipToBounds="True">
+                    <Image x:Name="IncomingCalendar" Canvas.Left="0" Canvas.Top="0" Width="{Binding ActualWidth, ElementName=CalendarContent}" Height="{Binding ActualHeight, ElementName=CalendarContent}" Visibility="Collapsed" Stretch="Fill"><Image.RenderTransform><TranslateTransform/></Image.RenderTransform></Image>
                     <Image x:Name="OutgoingCalendar" Canvas.Left="0" Canvas.Top="0" Width="{Binding ActualWidth, ElementName=CalendarContent}" Height="{Binding ActualHeight, ElementName=CalendarContent}" Visibility="Collapsed" Stretch="Fill"><Image.RenderTransform><TranslateTransform/></Image.RenderTransform></Image>
                 </Canvas>
                 <Border infrastructure:AppearanceAnimation.Enabled="True" Grid.RowSpan="4" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="20" HorizontalAlignment="Right" Width="340" Visibility="{Binding SettingsOpen, Converter={StaticResource VisibleIf}}">
@@ -150,7 +151,7 @@
                 <Button Command="{Binding CloseEventCommand}" Background="Transparent" Padding="0" Margin="0" BorderThickness="0" Focusable="False" ToolTip="{DynamicResource Ui.Backtocalendar}">
                     <Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"/></ControlTemplate></Button.Template>
                 </Button>
-                <Border DataContext="{Binding SelectedEvent}" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="22" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="EventDetailsCard" DataContext="{Binding SelectedEvent}" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="22" MaxWidth="640" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel Margin="0,0,0,16">
@@ -166,7 +167,7 @@
                                     <TextBlock Text="{DynamicResource Ui.LOCATION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><TextBlock Text="{Binding Location}" FontSize="13"/>
                                 </StackPanel>
                                 <StackPanel Visibility="{Binding HasDescription, Converter={StaticResource VisibleIf}}">
-                                    <TextBlock Text="{DynamicResource Ui.DESCRIPTION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:LinkTextBlock ContentText="{Binding Description}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
+                                    <TextBlock Text="{DynamicResource Ui.DESCRIPTION}" Style="{StaticResource Caption}" Margin="0,0,0,6"/><controls:RichDescriptionTextBlock ContentText="{Binding FormattedDescription}" FontSize="13" LineHeight="20" TextWrapping="Wrap" Hyperlink.RequestNavigate="OnDescriptionLink"/>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>

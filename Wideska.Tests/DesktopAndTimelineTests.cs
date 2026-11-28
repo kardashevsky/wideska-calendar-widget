@@ -76,16 +76,16 @@ internal static partial class Program
         Check(layout[0].LaneCount == 2 && layout[1].Lane != layout[0].Lane && layout[2].LaneCount == 1, "Overlap groups must retain stable stacking offsets without narrowing unrelated events");
         Check(layout[0].HorizontalOffset + layout[0].WidthFraction > layout[1].HorizontalOffset && layout[2].WidthFraction == 1, "Concurrent cards must overlap horizontally while unrelated cards keep their full width");
         var day = new DayCell(new DateTime(2026,3,8), true, true, events);
-        var timeline = new Wideska.Controls.DayTimeline { Days = new[] { day }, TimeZoneId = "America/New_York", CurrentTime = instant, Foreground = System.Windows.Media.Brushes.White, Width = 600, Height = 1600 };
-        timeline.Measure(new Size(600,1600)); timeline.Arrange(new Rect(0,0,600,1600)); timeline.UpdateLayout();
-        var image = new System.Windows.Media.Imaging.RenderTargetBitmap(600,1600,96,96,System.Windows.Media.PixelFormats.Pbgra32);
+        var timeline = new Wideska.Controls.DayTimeline { Days = new[] { day }, TimeZoneId = "America/New_York", CurrentTime = instant, Foreground = System.Windows.Media.Brushes.White, Width = 600, Height = 2000 };
+        timeline.Measure(new Size(600,2000)); timeline.Arrange(new Rect(0,0,600,2000)); timeline.UpdateLayout();
+        var image = new System.Windows.Media.Imaging.RenderTargetBitmap(600,2000,96,96,System.Windows.Media.PixelFormats.Pbgra32);
         image.Render(timeline);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
         using (var file = System.IO.File.Create("artifacts/timeline.png")) encoder.Save(file);
         double headerHeight = ((System.Windows.Media.DrawingVisual)System.Windows.Media.VisualTreeHelper.GetChild(timeline, 1)).ContentBounds.Height;
         double overlapY = headerHeight + 100d / 1440 * (timeline.ActualHeight - headerHeight - Wideska.Controls.DayTimeline.TimelineBottomPadding);
         Check(timeline.EventAt(new Point(200, overlapY))?.Title == "A" && timeline.EventAt(new Point(300, overlapY))?.Title == "B", "Exposed rear cards and topmost overlapping cards must retain the correct click targets");
-        Check(timeline.ActualHeight == 1600, "Timeline must scale to its available drawing height");
+        Check(timeline.ActualHeight == 2000, "Timeline must scale to its available drawing height");
         await TestCalendarClockAndPersistenceAsync(System.IO.Path.Combine(directory, "clock"));
     }
 }

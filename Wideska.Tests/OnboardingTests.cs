@@ -52,7 +52,7 @@ internal static partial class Program
         Check(vm.ShowAuthorization && !vm.ShowWidget, "No calendar may flash before the initial account check");
         await vm.InitializeAsync();
         Check(vm.ShowAuthorization && !vm.ShowWidget && vm.Calendars.Count == 0 && provider.Requests == 0, "Signed-out launch must not display cached account data or request events");
-        var window = new Wideska.MainWindow(vm, false) { Width = 480, Height = 740 };
+        var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 480, Height = 740 };
         window.Show();
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(!((UIElement)window.FindName("WidgetRoot")).IsVisible && ((UIElement)window.FindName("AuthorizationRoot")).IsVisible, "Authorization must replace the calendar in the visual tree");
@@ -89,6 +89,7 @@ internal static partial class Program
         SavePreview(window, "event-details", true);
         vm.CloseEventCommand.Execute(null);
         Check(!vm.IsEventOpen && vm.IsCalendarEnabled, "Closing details must restore calendar interaction");
+        await TestRichEventDetailsAsync(app, window, vm, provider);
         vm.FitDesktopCommand.Execute(null);
         Check(vm.IsDesktopFilled && !vm.CanMoveWidget && vm.WidgetCornerRadius.TopLeft == 0 && vm.CanEditGeometry, "Desktop fill must square corners and prevent dragging while permitting resize to exit");
         vm.FitDesktopCommand.Execute(null);
@@ -102,6 +103,8 @@ internal static partial class Program
         Check(window.AllowsTransparency && window.Opacity == 1 && !window.ShowInTaskbar, "Layered widget must preserve text opacity and stay out of the taskbar");
         vm.BackgroundOpacity = 0;
         Check(((SolidColorBrush)app.Resources["WidgetGlass"]).Color.A == 0 && window.Opacity == 1, "Zero tint must make the background fully transparent without fading text");
+        // Measure the glass independently of calendar content, including intentional past-day shading.
+        calendarContent.Visibility = Visibility.Hidden;
         window.UpdateLayout();
         var alphaProbe = new RenderTargetBitmap(720, 560, 96, 96, PixelFormats.Pbgra32);
         alphaProbe.Render(window);
@@ -114,6 +117,7 @@ internal static partial class Program
         alphaProbe.Clear(); alphaProbe.Render(window);
         alphaProbe.CopyPixels(new Int32Rect(10, 280, 1, 1), pixel, 4, 0);
         Check(pixel[3] is > 0 and < 255, "Rendered default glass must actually contain translucent pixels");
+        calendarContent.Visibility = Visibility.Visible;
         var grip = (System.Windows.Controls.Primitives.Thumb)window.FindName("ResizeGrip");
         grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(40, 20) { RoutedEvent = System.Windows.Controls.Primitives.Thumb.DragDeltaEvent });
         Check(window.Width == 760 && window.Height == 580, "Corner grip must resize a transparent frameless window");
@@ -151,10 +155,13 @@ internal static partial class Program
             Check(Math.Abs(calendarContent.ActualHeight - transitionHeight) < .5, "Carousel snapshot must not change calendar layout height during navigation");
             previous.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, previous));
             vm.PreviousCommand.Execute(null);
-            await Task.Delay(500);
+            await Task.Delay(750);
             Check(outgoing.Source is null && outgoing.Visibility == Visibility.Collapsed && Math.Abs(((TranslateTransform)calendarContent.RenderTransform).X) < .01 && Math.Abs(calendarContent.Opacity - 1) < .01,
                 "Rapid navigation must finish with a fully visible calendar and release transition snapshots");
         }
+        await TestTodayNavigationAsync(app, window);
+        await TestCarouselPerformanceAsync(app, window);
+        await TestRapidNavigationAsync(app, window);
         vm.View = CalendarView.Month;
         window.Width = 420; window.Height = 360;
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

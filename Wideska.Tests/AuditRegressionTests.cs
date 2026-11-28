@@ -105,7 +105,7 @@ internal static partial class Program
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
             Check(references.All(reference => !reference.IsAlive), "Closed windows must not be retained by a live view model's event subscriptions");
 
-            var window = new Wideska.MainWindow(vm, false) { Width = 3000, Height = 1800 };
+            var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 3000, Height = 1800 };
             window.Show();
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             vm.View = CalendarView.Week;
@@ -122,6 +122,9 @@ internal static partial class Program
             Check(!timeline.IsTodayColumnVisible && todayButton.Visibility == Visibility.Visible,
                 "Show today must remain available when today's column is outside the horizontal viewport");
             todayButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, todayButton));
+            if (SystemParameters.ClientAreaAnimation)
+                Check(((Image)window.FindName("OutgoingCalendar")).Source is not null,
+                    "Revealing a horizontally hidden today column must use the same carousel transition");
             await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(timeline.IsTodayColumnVisible && todayButton.Visibility == Visibility.Collapsed,
                 "Show today must reveal the current column before hiding itself");
@@ -141,6 +144,8 @@ internal static partial class Program
                 Check(Math.Max(snapshot.PixelWidth, snapshot.PixelHeight) <= 2048, "Large-screen navigation snapshots must be capped at 2048 pixels per side");
                 window.Hide();
                 Check(outgoing.Source is null, "Hiding the widget mid-transition must immediately release its snapshot");
+                Check(((Image)window.FindName("IncomingCalendar")).Source is null,
+                    "Hiding the widget must also release the incoming snapshot");
             }
             window.Close();
 

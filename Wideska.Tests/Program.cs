@@ -37,6 +37,9 @@ internal static partial class Program
     private static async Task RunAsync(Application app)
     {
         TestMinuteBoundary();
+        TestPastDayRendering();
+        TestTimelineReadability();
+        TestRichDescriptions();
         string linkedDescription = EventText.ToPlainText("Join <a href='https://example.com/meet?a=1&amp;b=2'>meeting</a>");
         Check(linkedDescription.Contains("https://example.com/meet?a=1&b=2"), "HTML descriptions must preserve link destinations and decode query parameters");
         var linkText = new Wideska.Controls.LinkTextBlock { ContentText = linkedDescription + " www.example.org. https://example.com/page)." };
@@ -96,7 +99,7 @@ internal static partial class Program
             await vm.RefreshAsync();
             // Load actual compiled XAML and render every view, including both themes and minimum dimensions.
             app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Wideska;component/Resources/Styles.xaml") });
-            var window = new Wideska.MainWindow(vm, false) { Width = 960, Height = 680 };
+            var window = new Wideska.MainWindow(vm, false, enableIdleReturn: false) { Width = 960, Height = 680 };
             int bindingErrors = 0;
             var listener = new BindingListener(() => bindingErrors++);
             System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add(listener);
@@ -157,6 +160,7 @@ internal static partial class Program
             var saved = await store.ReadAsync<WidgetSettings>("settings.bin", true);
             Check(saved?.View == CalendarView.Month, "Settings must persist");
             await TestOnboardingAsync(app, directory);
+            await TestIdleReturnAsync(app, directory);
             await TestTimeIndicatorAsync(app, directory);
             await TestAuditRegressionsAsync(app, directory);
         }
