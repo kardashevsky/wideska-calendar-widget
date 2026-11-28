@@ -51,6 +51,7 @@ internal static partial class Program
             savedOffset = settledOffset;
         }
         await TestVisualScrollingAsync(app, window, timeline, viewer);
+        await TestScrollInputRoutingAsync(app, window, timeline, viewer);
         SavePreview(window, "sticky-day-header", true);
     }
 }
