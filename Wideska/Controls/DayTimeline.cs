@@ -350,6 +350,9 @@ public sealed class DayTimeline : Control
     {
         DrawPassCount++;
         base.OnRender(dc);
+        // Retain a stationary input surface even where the moving layer has no ink.
+        // Otherwise wheel input over empty slots falls through to native scrolling.
+        dc.DrawRectangle(Brushes.Transparent, null, new Rect(new Size(ActualWidth, ActualHeight)));
         using var body = calendarBody.RenderOpen();
         DrawCalendar(body);
     }
