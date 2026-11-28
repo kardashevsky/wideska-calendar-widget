@@ -64,7 +64,8 @@
                     </Viewbox>
                     </Grid>
                 </Grid>
-                <Canvas Grid.Row="2" IsHitTestVisible="False" ClipToBounds="True">
+                <Canvas x:Name="CalendarTransitionSurface" Grid.Row="2" IsHitTestVisible="False" ClipToBounds="True">
+                    <Image x:Name="IncomingCalendar" Canvas.Left="0" Canvas.Top="0" Width="{Binding ActualWidth, ElementName=CalendarContent}" Height="{Binding ActualHeight, ElementName=CalendarContent}" Visibility="Collapsed" Stretch="Fill"><Image.RenderTransform><TranslateTransform/></Image.RenderTransform></Image>
                     <Image x:Name="OutgoingCalendar" Canvas.Left="0" Canvas.Top="0" Width="{Binding ActualWidth, ElementName=CalendarContent}" Height="{Binding ActualHeight, ElementName=CalendarContent}" Visibility="Collapsed" Stretch="Fill"><Image.RenderTransform><TranslateTransform/></Image.RenderTransform></Image>
                 </Canvas>
                 <Border infrastructure:AppearanceAnimation.Enabled="True" Grid.RowSpan="4" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="18" Padding="20" HorizontalAlignment="Right" Width="340" Visibility="{Binding SettingsOpen, Converter={StaticResource VisibleIf}}">

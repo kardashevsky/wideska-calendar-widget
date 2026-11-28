@@ -27,9 +27,10 @@ internal static partial class Program
                 Check(outgoing.Source is not null && outgoing.Visibility == Visibility.Visible,
                     "Show Today must capture the outgoing period before the command replaces its dates");
             model.TodayCommand.Execute(null);
+            await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(40);
             if (SystemParameters.ClientAreaAnimation)
-                Check(Math.Sign(((TranslateTransform)content.RenderTransform).X) == -direction,
+                Check(Math.Sign(((TranslateTransform)((Image)window.FindName("IncomingCalendar")).RenderTransform).X) == -direction,
                     "Show Today must slide forward from past periods and backward from future periods");
             Check(!model.ShouldShowToday, "Animated Show Today must still select the current period");
             await Task.Delay(450);
