@@ -27,6 +27,11 @@ public partial class MainWindow : Window
     private Point? dragPoint;
     private bool changingGeometryMode;
     private int transitionVersion;
+    private long calendarRevision;
+    private long preparedCalendarRevision;
+    private double preparedVerticalOffset;
+    private Size preparedCalendarSize;
+    private System.Windows.Media.Imaging.BitmapSource? preparedCalendar;
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     public MainWindow() : this(CreateViewModel(), true) { }
     private static MainViewModel CreateViewModel()
@@ -83,6 +88,8 @@ public partial class MainWindow : Window
     }
     private void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        calendarRevision++;
+        preparedCalendar = null;
         if (e.PropertyName == nameof(MainViewModel.WidgetCornerRadius)) UpdateWidgetClip();
         if (e.PropertyName is nameof(MainViewModel.SettingsOpen) or nameof(MainViewModel.IsEventOpen) or nameof(MainViewModel.ShowWidget)) StopNavigationTransition();
     }
@@ -96,6 +103,7 @@ public partial class MainWindow : Window
     }
     private void StopNavigationTransition()
     {
+        preparedCalendar = null;
         ++transitionVersion;
         if (CalendarContent is null || OutgoingCalendar is null) return;
         CalendarContent.RenderTransform.BeginAnimation(TranslateTransform.XProperty, null);
@@ -106,6 +114,8 @@ public partial class MainWindow : Window
         IncomingCalendar.RenderTransform.BeginAnimation(TranslateTransform.XProperty, null);
         IncomingCalendar.Visibility = Visibility.Collapsed;
         IncomingCalendar.Source = null;
+        ((TranslateTransform)IncomingCalendar.RenderTransform).X = 0;
+        ((TranslateTransform)OutgoingCalendar.RenderTransform).X = 0;
         CalendarContent.Opacity = 1;
         CalendarContent.IsHitTestVisible = true;
     }
@@ -143,11 +153,33 @@ public partial class MainWindow : Window
     }
     private void OnNavigatePeriod(object sender, RoutedEventArgs e)
         => BeginPeriodTransition(ReferenceEquals(sender, NextPeriodButton) ? 1 : -1);
+    private void OnPreparePeriodTransition(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left) PreparePeriodSnapshot();
+    }
+    private void OnPreparePeriodKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Space or Key.Enter) PreparePeriodSnapshot();
+    }
+    private void OnLeavePeriodButton(object sender, MouseEventArgs e) => preparedCalendar = null;
+    private void PreparePeriodSnapshot()
+    {
+        if (!SystemParameters.ClientAreaAnimation || OutgoingCalendar.Visibility == Visibility.Visible
+            || CalendarContent.ActualWidth < 1 || CalendarContent.ActualHeight < 1 || Timeline.IsScrollAnimating) return;
+        preparedCalendar = CaptureCalendar(CalendarContent);
+        preparedCalendarRevision = calendarRevision;
+        preparedVerticalOffset = Timeline.DisplayedVerticalOffset;
+        preparedCalendarSize = new Size(CalendarContent.ActualWidth, CalendarContent.ActualHeight);
+    }
     private void BeginPeriodTransition(double direction)
     {
         if (!SystemParameters.ClientAreaAnimation || CalendarContent.ActualWidth < 1 || CalendarContent.ActualHeight < 1) return;
         // Preserve the currently displayed composition when navigation interrupts an earlier slide.
-        var outgoingSnapshot = CaptureCalendar(OutgoingCalendar.Visibility == Visibility.Visible ? CalendarTransitionSurface : CalendarContent);
+        var outgoingSnapshot = preparedCalendar is not null && preparedCalendarRevision == calendarRevision
+            && preparedVerticalOffset == Timeline.DisplayedVerticalOffset
+            && preparedCalendarSize == new Size(CalendarContent.ActualWidth, CalendarContent.ActualHeight)
+            ? preparedCalendar
+            : CaptureCalendar(OutgoingCalendar.Visibility == Visibility.Visible ? CalendarTransitionSurface : CalendarContent);
         StopNavigationTransition();
         int version = transitionVersion;
         double distance = CalendarContent.ActualWidth;
@@ -155,8 +187,14 @@ public partial class MainWindow : Window
         OutgoingCalendar.Visibility = Visibility.Visible;
         CalendarContent.Opacity = 0;
         CalendarContent.IsHitTestVisible = false;
+        // Give immediate, bounded feedback while the new layout is prepared. A heavy
+        // year view must not let the outgoing page leave before its replacement exists.
+        var outgoingTransform = (TranslateTransform)OutgoingCalendar.RenderTransform;
+        outgoingTransform.BeginAnimation(TranslateTransform.XProperty, new System.Windows.Media.Animation.DoubleAnimation(
+            0, -direction * Math.Min(12, distance * .02), TimeSpan.FromMilliseconds(80))
+        { EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut } });
         // Button commands update the dates after Click. Capture the new layout once it has settled.
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
             if (version != transitionVersion || !IsVisible) return;
             CalendarContent.Opacity = 1;
@@ -164,23 +202,21 @@ public partial class MainWindow : Window
             IncomingCalendar.Source = CaptureCalendar(CalendarContent);
             CalendarContent.Opacity = 0;
             IncomingCalendar.Visibility = Visibility.Visible;
-            var duration = TimeSpan.FromMilliseconds(300);
-            System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames Motion(double from, double to)
-            {
-                var animation = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
-                { Duration = duration, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
-                animation.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(from, TimeSpan.Zero));
-                animation.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(to, duration,
-                    new System.Windows.Media.Animation.KeySpline(.2, .75, .25, 1)));
-                return animation;
-            }
-            ((TranslateTransform)IncomingCalendar.RenderTransform).BeginAnimation(TranslateTransform.XProperty, Motion(direction * distance, 0));
-            var outgoingSlide = Motion(0, -direction * distance);
-            outgoingSlide.Completed += (_, _) =>
+            var duration = TimeSpan.FromMilliseconds(280);
+            var motion = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
+            { Duration = duration, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop, IsAdditive = true };
+            motion.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(outgoingTransform.X, TimeSpan.Zero));
+            motion.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(-direction * distance, duration,
+                new System.Windows.Media.Animation.KeySpline(.2, .75, .25, 1)));
+            var slideClock = motion.CreateClock();
+            slideClock.Completed += (_, _) =>
             {
                 if (version == transitionVersion) StopNavigationTransition();
             };
-            ((TranslateTransform)OutgoingCalendar.RenderTransform).BeginAnimation(TranslateTransform.XProperty, outgoingSlide);
+            outgoingTransform.ApplyAnimationClock(TranslateTransform.XProperty, slideClock);
+            var incomingTransform = (TranslateTransform)IncomingCalendar.RenderTransform;
+            incomingTransform.X = direction * distance;
+            incomingTransform.ApplyAnimationClock(TranslateTransform.XProperty, slideClock);
         });
     }
     private System.Windows.Media.Imaging.BitmapSource CaptureCalendar(FrameworkElement source)

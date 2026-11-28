@@ -17,7 +17,13 @@ internal static partial class Program
         var outgoing = (Image)window.FindName("OutgoingCalendar");
         var incoming = (Image)window.FindName("IncomingCalendar");
         var next = (Button)window.FindName("NextPeriodButton");
+        next.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+            { RoutedEvent = UIElement.PreviewMouseDownEvent });
+        var clickClock = System.Diagnostics.Stopwatch.StartNew();
         next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, next));
+        Console.WriteLine($"Carousel click setup: {clickClock.Elapsed.TotalMilliseconds:F1} ms");
+        Check(outgoing.RenderTransform.HasAnimatedProperties && incoming.Source is null,
+            "The outgoing slide must start during Click before the incoming layout is captured");
         model.NextCommand.Execute(null);
         await app.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(incoming.Source is { IsFrozen: true } && outgoing.Source is { IsFrozen: true },
