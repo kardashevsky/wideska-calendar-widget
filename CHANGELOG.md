@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Start carousel motion during the click handler, before preparing the incoming layout; synchronize both snapshots with one shared animation clock.
+- Prepare the outgoing snapshot on pointer/key press so releasing the navigation button can start motion immediately; discard prepared snapshots when content, position or size changes.
 - Slide frozen calendar snapshots for period navigation and Show Today without animating the live calendar layout; retain the displayed composition during rapid navigation and release both snapshots on completion, hide or resize.
 - Dim past calendar days and their events without blocking interaction; use the selected calendar time zone and preserve today's highlighting.
 - Animate wheel scrolling through retained visual translation without arranging or redrawing the calendar each frame; commit the native offset only when movement finishes.
