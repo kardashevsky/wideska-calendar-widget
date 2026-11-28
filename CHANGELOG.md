@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep only the date header's top corners rounded so its lower edge joins the calendar grid seamlessly.
 - End the timeline at the final midnight label without trailing shaded space; use uniform one-pixel grid strokes at the current DPI.
 - Keep hourly slots compact; show short-event titles and complete time ranges side by side when a second line does not fit.
 - Narrow the live-time badge and left-align its monospaced clock so ticking seconds cannot shift the text.
