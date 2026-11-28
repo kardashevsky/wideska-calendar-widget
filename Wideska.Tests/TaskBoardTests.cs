@@ -82,7 +82,8 @@ internal static partial class Program
             var dropTargets = Descendants(window).OfType<Border>().Where(b => b.Name == "DropZone" && b.AllowDrop).ToList();
             Check(dropTargets.Count == 6 && dropTargets.All(b => b.DataContext is TaskColumn), "All six task destinations must accept drag and drop");
             Check(!window.ShowInTaskbar && !window.ShowActivated, "The task board must retain widget presentation without initial activation");
-            window.Hide();
+            window.Close();
+            Check(!window.IsVisible && ReferenceEquals(window.DataContext, board), "Closing the task board must hide it while retaining its tasks for restoration");
             window.ShowWidget();
             Check(window.IsVisible && !window.ShowActivated, "The tray action must restore the task board without requesting activation");
             SavePreview(window, "task-board-prototype");

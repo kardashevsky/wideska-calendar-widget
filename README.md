@@ -4,8 +4,10 @@ An MIT-licensed collection of Windows desktop widgets for personal planning: a c
 
 ## Task matrix prototype
 
-Build and launch the current development executable, then choose **Task matrix**
-from the tray. Exit an older running build first: the single-instance mechanism
+Build and launch the current development executable. The matrix opens alongside
+the calendar automatically, without waiting for Google synchronization. Use
+**Task matrix** in the tray to hide or restore the matrix independently.
+Exit an older running build first: the single-instance mechanism
 otherwise restores that existing version.
 
 The independent widget has Backlog on the left, four priority quadrants in the
@@ -24,8 +26,8 @@ automatically assigned deadlines:
 Tasks are saved locally with Windows encryption in a separate `task-board.bin`
 file under the existing application data directory. They do not require Google
 authorization. Drag the heading to move the widget; use its lower-right grip to
-resize it. Position is saved after dragging/resizing and on exit. Alt+F4 hides
-the board; reopen it from the tray. Exit from the tray saves both widgets, and
+resize it. Position is saved after dragging/resizing and on exit. The task matrix
+tray action toggles its visibility. Exit from the tray saves both widgets, and
 failed task writes are shown with a Retry action.
 
 This prototype does not yet schedule tasks into Google Calendar, synchronize

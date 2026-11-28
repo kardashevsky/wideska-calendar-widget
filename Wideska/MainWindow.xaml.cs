@@ -72,17 +72,22 @@ public partial class MainWindow : Window
         {
             desktop = new DesktopIntegration(this);
             desktop.QuitRequested += Quit;
-            desktop.TaskBoardRequested += ShowTaskBoard;
+            desktop.TaskBoardRequested += () =>
+            {
+                if (taskBoard?.IsVisible == true) taskBoard.Close();
+                else ShowTaskBoard();
+            };
             desktop.SettingsRequested += () => model.SettingsOpen = model.ShowWidget;
             desktop.SyncRequested += () => model.RefreshCommand.Execute(null);
             desktop.GeometryLockChanged += value => model.GeometryLocked = value;
             desktop.FitDesktopRequested += FitDesktop;
             desktop.Host.GeometryChanged += QueueGeometrySave;
+            ShowTaskBoard();
             await model.InitializeAsync();
-            if (quitting) return;
             if (quitting) return;
             initialized = true;
             ApplyAppearance();
+            taskBoard?.RefreshLanguage();
             QueueGeometrySave();
         }
         catch (Exception ex) { model.ReportError(ex); }
